@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Virtualenv / tooling
+.env
+.env.*
+.venv/
+venv/
+ENV/
+.python-version
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+
+# Secrets / runtime
+.secrets/
+secrets/
+*.log
+env
+
+# Docker / compose
+docker-compose.override.yml
+*.local.yaml
