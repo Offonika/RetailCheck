@@ -1,0 +1,16 @@
+[Unit]
+Description=RetailCheck Telegram Checklist Bot
+After=network.target
+Requires=redis.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/retailcheck
+Environment="APP_ENV=production"
+EnvironmentFile=%h/retailcheck/.env
+ExecStart=/usr/bin/env poetry run python -m retailcheck
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

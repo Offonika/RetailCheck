@@ -1,0 +1,8 @@
+● retailcheck.service - RetailCheck bot
+     Loaded: loaded (/etc/systemd/system/retailcheck.service; enabled; vendor preset: enabled)
+     Active: activating (auto-restart) (Result: exit-code) since Sat 2025-11-15 09:10:47 MSK; 3s ago
+    Process: 1811924 ExecStart=/usr/bin/env bash -lc cd /opt/RetailCheck && poetry run python -m retailcheck [0;1;31m(code=exited, status=127)[0m
+   Main PID: 1811924 (code=exited, status=127)
+
+Nov 15 09:10:47 localhost systemd[1]: [0;1;39m[0;1;31m[0;1;39mretailcheck.service: Main process exited, code=exited, status=127/n/a[0m
+Nov 15 09:10:47 localhost systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mretailcheck.service: Failed with result 'exit-code'.[0m

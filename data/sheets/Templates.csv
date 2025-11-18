@@ -1,0 +1,3 @@
+template_id,name,version,phase,is_active,description
+opening_v1,"Открытие v1",1,open,TRUE,"Стартовые шаги ККМ"
+closing_v1,"Закрытие v1",1,close,TRUE,"Закрытие смены 19:00"

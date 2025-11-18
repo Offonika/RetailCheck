@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "retailcheck"
+version = "0.1.0"
+description = "Telegram checklist bot for retail shifts (one run per shop/day, opener/closer roles)"
+authors = ["RetailCheck Team <dev@retailcheck.local>"]
+readme = "docs/README.md"
+packages = [{ include = "retailcheck", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+google-api-python-client = "^2.129.0"
+google-auth = "^2.28.0"
+python-dotenv = "^1.0.1"
+redis = "^5.0.3"
+aiohttp = "^3.10.5"
+aiogram = "^3.5.0"
+loguru = "^0.7.2"
+apscheduler = "^3.10.4"
+qrcode = "^7.4.2"
+backports-zoneinfo = { version = "^0.2.1", markers = "python_version < '3.9'" }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.1"
+pytest-asyncio = "^0.23.6"
+ruff = "^0.5.4"
+mypy = "^1.9.0"
+types-redis = "^4.6.0.20240218"
+fakeredis = "^2.23.2"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+ignore_missing_imports = true
+strict_optional = true
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"

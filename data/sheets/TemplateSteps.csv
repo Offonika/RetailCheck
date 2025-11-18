@@ -1,0 +1,9 @@
+template_id,step_order,code,title,type,required,validators_json,norm_rule,hint,owner_role
+opening_v1,1,cash_float_open,"Сверка кассы при открытии",number,TRUE,"{""min"":0,""max"":200000}","constant:previous_close","Введите фактическую сумму кассы",opener
+opening_v1,2,pos_terminals_ready,"Проверка терминалов",check,TRUE,,,"Отметьте готовность POS-терминалов",opener
+opening_v1,3,storefront_photo,"Фото витрины/зала",photo,FALSE,,,"Загрузите фото, если есть изменения",opener
+closing_v1,1,cash_1900,"Касса 19:00",number,TRUE,"{""min"":0,""max"":200000}","reference:cash_float_open","Ожидаемая сумма = открытие + продажи",closer
+closing_v1,2,pos_sber,"Терминал Сбер",number,TRUE,"{""min"":0,""max"":200000}","reference:pos_terminals_ready","",closer
+closing_v1,3,pos_tbank,"Терминал Т-Банк",number,FALSE,"{""min"":0,""max"":200000}",,"",closer
+closing_v1,4,z_report_photo,"Фото Z-отчёта",photo,TRUE,,,"Минимум одно фото Z-отчёта",closer
+closing_v1,5,delta_comment,"Комментарий по расхождениям",text,FALSE,"{""delta_threshold"":300}",,"Обязателен автоматически при |Δ| ≥ 300 ₽",closer

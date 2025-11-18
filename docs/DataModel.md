@@ -22,24 +22,24 @@
 | created_at | datetime | ✔ | ISO 8601. |
 | updated_at | datetime | | Последняя правка. |
 
-## Shops
-
-| Поле | Тип | Обяз. | Описание |
-| --- | --- | --- | --- |
-| shop_id | string | ✔ | Уникальный код магазина. |
-| name | string | ✔ | Отображаемое название. |
-| timezone | string | | Olson TZ (по умолчанию Europe/Moscow). |
-| reminder_slots | string | | Пользовательское расписание (например, `11:00,16:00,19:00`). |
-| is_active | bool | ✔ | Магазин участвует в расписании. |
-| created_at | datetime | ✔ | Время создания. |
+## Sheet: `Shops`
+- `shop_id, name, timezone, open_time, close_time, manager_usernames, employee_usernames, reminder_slots, allow_anyone (TRUE|FALSE), dual_cash_mode (TRUE|FALSE), is_active`
+  - `timezone` — идентификатор из базы IANA (`Europe/Moscow`). Используется для расчёта напоминаний и конвертации дат.
+  - `open_time` / `close_time` — плановые часы магазина в формате HH:MM (локальная таймзона).
+  - `reminder_slots` — опциональный JSON (например, `{"dual_checks":["12:00","13:00","13:30","15:00","16:00","16:30","17:30"]}`) для магазинов с двумя кассами. Если пусто, используем дефолтные напоминания `open_time−15` и `close_time−30`.
+  - `allow_anyone=FALSE` по умолчанию. Значение `TRUE` используем только для тестовых магазинов; рабочие магазины требуют явного перечисления `telegram_username` в manager/employee списках.
+  - `dual_cash_mode` — включает режим двух касс (opener и closer ведут параллельные шаги). По умолчанию `FALSE`.
+  - Кросс-замены фиксируем через пересекающиеся `employee_usernames`: например, `@Zuuuuhra99` и `@o_lisaaaa` добавлены в оба магазина, чтобы подменять коллег; аналогично `@a1III11`/`@VviVkk` могут выходить в магазине 1.
+  - Обновление whitelists/менеджеров выполняется напрямую в листе `Shops` (бот перечитывает список перед назначением ролей).
 
 ## Templates
 
 | Поле | Тип | Обяз. | Описание |
 | --- | --- | --- | --- |
 | template_id | string | ✔ | Идентификатор шаблона (e.g. `evening_shift_v1`). |
-| name | string | ✔ | Название («Вечерняя смена»). |
+| name | string | ✔ | Название («Открытие», «Закрытие»). |
 | version | int | ✔ | Версия шаблона. Рост версии = миграция. |
+| phase | enum(open, check_1100, check_1600, check_1900, close, finance) | ✔ | Какой фазе смены соответствует шаблон/блок. |
 | is_active | bool | ✔ | Флаг доступности. |
 | description | string | | Комментарий / заметки по шаблону. |
 
@@ -56,38 +56,39 @@
 | validators_json | string | | JSON с правилами (`min`, `max`, `regex`, `delta_threshold`). |
 | norm_rule | string | | Определение нормы (константа, ссылочный шаг, ручной ввод). |
 | hint | string | | Дополнительная подсказка. |
+| owner_role | enum(opener, closer, shared) | | Какая роль должна видеть шаг. Пустое значение трактуем как `shared`. |
 
-## Runs
+Пилотный шаблон состоит из четырёх фаз и повторяющихся дневных сверок:
+- `open`: `open_checkin`, `open_pos_check`, `open_cash_start`, `open_note`.
+- `check_1100`, `check_1600`, `check_1900`: `chkXXXX_start`, `chkXXXX_sum`, `chkXXXX_receipts`, `chkXXXX_non_cash`, `chkXXXX_comment`.
+- `close`: `close_start`, `close_done_1c`, `close_form_receipt`, `close_z_sum`, `close_cash_end`, `close_cash_move`, `close_comment`.
+- `finance`: `fin_receipts_photo`, `fin_report_dc1c`, `fin_z_photo`, `fin_sberbank_sum`, `fin_tbank_sum`, `fin_comment`.
 
-| Поле | Тип | Обяз. | Описание |
-| --- | --- | --- | --- |
-| run_id | string | ✔ | UUID смены. |
-| date | date | ✔ | Дата смены (YYYY-MM-DD). |
-| shop_id | string | ✔ | FK → Shops. |
-| template_id | string | ✔ | Какой шаблон использован. |
-| started_by | string | ✔ | user_id инициатора. |
-| status | enum(in_progress, done, returned) | ✔ | Статус жизненного цикла. |
-| version | int | ✔ | Служит для оптимистичной блокировки. |
-| created_at | datetime | ✔ | Время создания. |
-| finished_at | datetime | | Заполняется при статусе `done`. |
-| returned_at | datetime | | Когда менеджер вернул смену. |
-| reminder_state | json | | Служебный объект (на какие слоты отправлены напоминания). |
+Для магазинов с `dual_cash_mode = TRUE` эти шаги дублируются/разделяются через `owner_role`: opener заполняет свой набор (касса А), closer — свой (касса B). Общие шаги (например, комментарий менеджеру) отмечаются как `shared`.
 
-## RunSteps
+## Sheet: `Runs`
+- `run_id` (uuid)
+- `date` (YYYY-MM-DD, в таймзоне магазина)
+- `shop_id` (string)
+- `status` (`opened | in_progress | ready_to_close | closed | returned`)
+- `opener_user_id` (int64), `opener_username` (string, optional), `opener_at` (ISO datetime)
+- `closer_user_id` (int64), `closer_username` (string, optional), `closer_at` (ISO datetime)
+- `current_active_user_id` (int64) — кто сейчас ведёт смену; блокирует закрытие и повторные действия.
+- `template_open_id` (string), `template_close_id` (string)
+- `template_phase_map` (json) — сопоставление `phase → template_id` (например, `{"open":"open_v1","check_1100":"check_morning_v1","check_1600":"check_midday_v1","check_1900":"check_evening_v1","close":"close_v1","finance":"finance_v1"}`)
+- `delta_rub` (number), `comment` (string)
+- `version` (int), `created_at`, `finished_at` (ISO)
 
-| Поле | Тип | Обяз. | Описание |
-| --- | --- | --- | --- |
-| run_id | string | ✔ | FK → Runs. |
-| step_code | string | ✔ | FK → TemplateSteps.code. |
-| value_number | decimal(15,2) | | Значение для числовых шагов (в рублях). |
-| value_text | string | | Текстовые ответы. |
-| value_check | bool | | Галочки. |
-| delta_number | decimal(15,2) | | Разница факт−норма (0 для текстовых). |
-| comment | string | | Обязателен при |delta| ≥ порога. |
-| status | enum(pending, ok, error) | ✔ | Состояние шага. |
-| attachments | string[] | | Список telegram_file_id (для фото шагов). |
-| updated_at | datetime | ✔ | Последняя правка. |
-| idempotency_key | string | ✔ | UUID батча записи. |
+**Инварианты:**
+- Уникальность `(shop_id, date)` для статусов `opened|in_progress|ready_to_close|closed`.
+- Нельзя ставить `closed` без прикреплённого Z-фото в `RunSteps`.
+- `current_active_user_id` очищается при `closed`/`returned`, обновляется при «Открыть/Продолжить/Передача роли».
+- Поля `template_open_id` и `template_close_id` дублируют значения из `template_phase_map.open` и `.close` (оставлены для обратной совместимости, но должны синхронизироваться при записи).
+
+## Sheet: `RunSteps`
+- `run_id, phase(open|check_1100|check_1600|check_1900|close|finance), step_code, owner_role(opener|closer|shared), value_*, delta_number, comment, status, updated_at, idempotency_key, performer_user_id`
+
+`owner_role` дублирует значение из TemplateSteps и помогает боту/напоминаниям понимать, кому показывать шаг. `performer_user_id` (опционально) фиксирует, кто фактически обновил шаг — важно для сценария двух касс.
 
 ## Attachments
 
@@ -99,31 +100,36 @@
 | kind | enum(z_report, pos_receipt, other) | ✔ | Тип вложения. |
 | created_at | datetime | ✔ | Момент загрузки. |
 
-## Audit
-
-| Поле | Тип | Обяз. | Описание |
-| --- | --- | --- | --- |
-| ts | datetime | ✔ | Время события. |
-| user_id | string | | Кто инициировал (бот, сотрудник, менеджер). |
-| action | string | ✔ | Ключевое событие (`run_created`, `step_updated`, `returned`). |
-| entity | enum(run, run_step, export) | ✔ | Тип сущности. |
-| entity_id | string | ✔ | ID сущности. |
-| details | json | | Полезная нагрузка (дельта, комментарий, стар/нов значения). |
+## Sheet: `Audit`
+- `ts, user_id, action(start_open|start_close|handover_open|handover_close|finish_close|step_update), entity(run|run_step), entity_id, details`
 
 ## Export
 
 | Поле | Тип | Обяз. | Описание |
 | --- | --- | --- | --- |
 | export_id | string | ✔ | UUID операции экспорта. |
+| generated_at | datetime | ✔ | Время генерации (UTC). |
 | period_start | date | ✔ | Начало диапазона. |
 | period_end | date | ✔ | Конец диапазона. |
 | shop_id | string | ✔ | Магазин (или `ALL`). |
+| shop_name | string | ✔ | Официальное название магазина (для бухгалтерии). |
 | run_id | string | ✔ | Смена, к которой относится строка. |
-| status | enum(done, returned) | ✔ | Статус смены. |
-| totals_json | json | ✔ | Набор агрегатов (касса 11/16/19, терминалы). |
+| run_date | date | ✔ | Дата смены (в таймзоне магазина). |
+| status | enum(closed, returned) | ✔ | Статус смены. |
+| opener_user_id | string | ✔ | user_id или tg_id opener. |
+| opener_username | string | | username opener. |
+| opener_at | datetime | | Время назначения/старта opener. |
+| closer_user_id | string | | user_id или tg_id closer. |
+| closer_username | string | | username closer. |
+| closer_at | datetime | | Время назначения/закрытия closer. |
+| totals_json | json | ✔ | Набор агрегатов (касса 11/16/19, терминалы). Для магазинов с двумя кассами добавляем вложенные блоки `opener`/`closer`. |
+| cash_total | decimal(15,2) | | Сумма наличных (дублируем из totals). |
+| noncash_total | decimal(15,2) | | Сумма безнал/эквайринг. |
 | delta_total | decimal(15,2) | ✔ | Суммарная дельта. |
-| attachments_summary | string | | Ссылки/ID фото. |
-| generated_at | datetime | ✔ | Время генерации. |
+| delta_comment | string | | Комментарий по дельте (если |Δ| ≥ threshold). |
+| comment | string | | Общий комментарий по смене (Runs.comment). |
+| attachments_summary | string | | Ссылки/ID фото (Z-отчёт, чеки). При dual-mode указываем, к какой роли относится фото. |
+| audit_link | string | | Ссылка/ID строки Audit для быстрой навигации. |
 
 ## Связи и индексы (логические)
 - Runs → RunSteps, Attachments (1:N). Гарантируем по run_id.

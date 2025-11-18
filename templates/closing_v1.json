@@ -1,0 +1,55 @@
+{
+  "template": {
+    "template_id": "closing_v1",
+    "name": "Закрытие v1",
+    "version": 1,
+    "phase": "close",
+    "description": "Закрытие смены 19:00"
+  },
+  "steps": [
+    {
+      "step_order": 1,
+      "code": "cash_1900",
+      "title": "Касса 19:00",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":200000}",
+      "norm_rule": "reference:cash_float_open",
+      "hint": "Ожидаемая сумма = открытие + продажи"
+    },
+    {
+      "step_order": 2,
+      "code": "pos_sber",
+      "title": "Терминал Сбер",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":200000}",
+      "norm_rule": "reference:pos_terminals_ready"
+    },
+    {
+      "step_order": 3,
+      "code": "pos_tbank",
+      "title": "Терминал Т-Банк",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":200000}"
+    },
+    {
+      "step_order": 4,
+      "code": "z_report_photo",
+      "title": "Фото Z-отчёта",
+      "type": "photo",
+      "required": true,
+      "hint": "Минимум одно фото Z-отчёта"
+    },
+    {
+      "step_order": 5,
+      "code": "delta_comment",
+      "title": "Комментарий по расхождениям",
+      "type": "text",
+      "required": false,
+      "validators_json": "{\"delta_threshold\":300}",
+      "hint": "Обязателен автоматически при |Δ| ≥ 300 ₽"
+    }
+  ]
+}

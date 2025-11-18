@@ -12,6 +12,7 @@ coverage.xml
 # Virtualenv / tooling
 .env
 .env.*
+!.env.example
 .venv/
 venv/
 ENV/

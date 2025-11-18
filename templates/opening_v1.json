@@ -1,0 +1,37 @@
+{
+  "template": {
+    "template_id": "opening_v1",
+    "name": "Открытие v1",
+    "version": 1,
+    "phase": "open",
+    "description": "Стартовые шаги ККМ (утро)"
+  },
+  "steps": [
+    {
+      "step_order": 1,
+      "code": "cash_float_open",
+      "title": "Сверка кассы при открытии",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":200000}",
+      "norm_rule": "constant:previous_close",
+      "hint": "Введите фактическую сумму кассы"
+    },
+    {
+      "step_order": 2,
+      "code": "pos_terminals_ready",
+      "title": "Проверка терминалов",
+      "type": "check",
+      "required": true,
+      "hint": "Отметьте готовность POS-терминалов"
+    },
+    {
+      "step_order": 3,
+      "code": "storefront_photo",
+      "title": "Фото витрины/зала",
+      "type": "photo",
+      "required": false,
+      "hint": "Загрузите фото, если есть изменения"
+    }
+  ]
+}
