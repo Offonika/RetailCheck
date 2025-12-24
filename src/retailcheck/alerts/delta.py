@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aiogram import Bot
+from aiogram.client.bot import DefaultBotProperties
 from loguru import logger
 from redis.asyncio import Redis
 
@@ -25,7 +26,10 @@ class DeltaAlertService:
         self._runsteps_repo = runsteps_repo
         self._shops_repo = shops_repo
         self._redis = redis
-        self._bot = Bot(token=config.bot.token, parse_mode="HTML")
+        self._bot = Bot(
+            token=config.bot.token,
+            default=DefaultBotProperties(parse_mode="HTML"),
+        )
 
     async def run(self) -> None:
         threshold = self._config.alerts.delta_threshold_rub

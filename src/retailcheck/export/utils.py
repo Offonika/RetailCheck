@@ -32,8 +32,10 @@ async def append_export_record(
     )
     total_delta = sum(float(step.delta_number) for step in steps if step.delta_number)
     shop_name = await _resolve_shop_name(run.shop_id, shops_repository)
-    cash_total = _aggregate_steps(steps, include_tokens={"cash"})
-    noncash_total = _aggregate_steps(steps, include_tokens={"non_cash", "sberbank", "tbank"})
+    cash_total = _aggregate_steps(steps, include_tokens={"cash"}, exclude_tokens={"noncash"})
+    noncash_total = _aggregate_steps(
+        steps, include_tokens={"non_cash", "noncash", "sberbank", "tbank"}
+    )
     delta_comment = (
         "; ".join(step.comment.strip() for step in steps if step.comment and step.delta_number)
         or None
@@ -69,12 +71,15 @@ async def _resolve_shop_name(
 def _aggregate_steps(
     steps: Sequence[RunStepRecord],
     include_tokens: set[str],
+    exclude_tokens: set[str] | None = None,
 ) -> str | None:
     total = 0.0
     found = False
     for step in steps:
         code = step.step_code.lower()
         if not any(token in code for token in include_tokens):
+            continue
+        if exclude_tokens and any(token in code for token in exclude_tokens):
             continue
         value = step.value_number or step.value_text or step.value_check
         if not value:

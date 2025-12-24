@@ -44,6 +44,15 @@
     },
     {
       "step_order": 5,
+      "code": "photo_terminal_1",
+      "title": "Сверка по терминалу (фото)",
+      "type": "photo",
+      "required": true,
+      "hint": "Выберите Т-Банк или Сбербанк и загрузите фото сверки",
+      "owner_role": "shared"
+    },
+    {
+      "step_order": 6,
       "code": "delta_comment",
       "title": "Комментарий по расхождениям",
       "type": "text",

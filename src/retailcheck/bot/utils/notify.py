@@ -53,4 +53,9 @@ async def broadcast_to_targets(
                 disable_web_page_preview=disable_preview,
             )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to send message to %s: %s", chat_id, exc)
+            logger.warning(
+                "Notify failed: chat_id=%s error=%s (%s)",
+                chat_id,
+                exc.__class__.__name__,
+                exc,
+            )

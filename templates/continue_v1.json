@@ -1,0 +1,148 @@
+{
+  "template": {
+    "template_id": "continue_v1",
+    "name": "Продолжить смену (роль B дневные)",
+    "version": 1,
+    "phase": "continue",
+    "description": "Дневные шаги для B: 11:00–20:00, выполняются параллельно с работой"
+  },
+  "steps": [
+    {
+      "step_order": 1,
+      "code": "start_continue",
+      "title": "Продолжение смены",
+      "type": "check",
+      "required": true,
+      "hint": "Подтвердите начало работы (B)",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 2,
+      "code": "cash_check_1",
+      "title": "Сверка кассы №1",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 3,
+      "code": "cash_check_2",
+      "title": "Сверка кассы №2",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 4,
+      "code": "cash_check_3",
+      "title": "Сверка кассы №3",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 5,
+      "code": "ds_balance",
+      "title": "Остаток ДС (денежные средства)",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите остаток денежных средств",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 6,
+      "code": "noncash_sber",
+      "title": "Безнал Сбербанк",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите сумму по терминалу Сбербанк",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 7,
+      "code": "noncash_tbank",
+      "title": "Безнал Т-Банк",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите сумму по терминалу Т-Банк",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 8,
+      "code": "acquiring_total",
+      "title": "Итого эквайринг",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите общую сумму по терминалам",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 9,
+      "code": "photo_terminal_sber",
+      "title": "Фото сверки Сбербанк",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото сверки терминала Сбербанк",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 10,
+      "code": "photo_terminal_tbank",
+      "title": "Фото сверки Т-Банк",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото сверки терминала Т-Банк",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 11,
+      "code": "stock_check",
+      "title": "Проверка остатков товара",
+      "type": "check",
+      "required": true,
+      "hint": "Подтвердите проверку остатков",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 12,
+      "code": "photo_storefront",
+      "title": "Фото витрины/зала",
+      "type": "photo",
+      "required": false,
+      "hint": "Загрузите фото при изменениях",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 13,
+      "code": "returns_check",
+      "title": "Проверка возвратов",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":100000}",
+      "hint": "Введите сумму возвратов (если были)",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 14,
+      "code": "encashment",
+      "title": "Инкассация",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите сумму инкассации (если была)",
+      "owner_role": "closer"
+    }
+  ]
+}
+
+

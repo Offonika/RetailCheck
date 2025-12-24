@@ -39,6 +39,10 @@ class TemplateDefaults:
         return self.get("open")
 
     @property
+    def continue_template_id(self) -> str:
+        return self.get("continue")
+
+    @property
     def closing_template_id(self) -> str:
         return self.get("close")
 
@@ -90,16 +94,18 @@ def load_app_config() -> AppConfig:
     run_scope = os.getenv("RUN_SCOPE", "shop_id_date")
     opening_template = os.getenv(
         "DEFAULT_TEMPLATE_OPEN_ID",
-        os.getenv("DEFAULT_TEMPLATE_ID", "opening_v1"),
+        os.getenv("DEFAULT_TEMPLATE_ID", "opening_v3"),
     )
-    closing_template = os.getenv("DEFAULT_TEMPLATE_CLOSE_ID", "closing_v1")
-    check_1100_template = os.getenv("DEFAULT_TEMPLATE_CHECK_1100_ID", closing_template)
-    check_1600_template = os.getenv("DEFAULT_TEMPLATE_CHECK_1600_ID", check_1100_template)
-    check_1900_template = os.getenv("DEFAULT_TEMPLATE_CHECK_1900_ID", check_1600_template)
+    continue_template = os.getenv("DEFAULT_TEMPLATE_CONTINUE_ID", "continue_v2")
+    closing_template = os.getenv("DEFAULT_TEMPLATE_CLOSE_ID", "closing_v3")
+    check_1100_template = os.getenv("DEFAULT_TEMPLATE_CHECK_1100_ID", continue_template)
+    check_1600_template = os.getenv("DEFAULT_TEMPLATE_CHECK_1600_ID", continue_template)
+    check_1900_template = os.getenv("DEFAULT_TEMPLATE_CHECK_1900_ID", continue_template)
     finance_template = os.getenv("DEFAULT_TEMPLATE_FINANCE_ID", closing_template)
     phase_map = MappingProxyType(
         {
             "open": opening_template,
+            "continue": continue_template,
             "check_1100": check_1100_template,
             "check_1600": check_1600_template,
             "check_1900": check_1900_template,

@@ -1,8 +1,7 @@
-"""
-Send reminder messages for a specific mode (open/close).
+"""Send reminder messages for pending steps (interval-based).
 
 Usage:
-    poetry run python tools/send_reminders.py --mode open [--shop-id shop_1]
+    poetry run python tools/send_reminders.py --mode pending_steps [--shop-id shop_1]
 """
 
 from __future__ import annotations
@@ -19,8 +18,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         required=True,
-        choices=("open", "close"),
-        help="Тип напоминания: open (перед открытием) или close (перед закрытием).",
+        choices=("pending_steps",),
+        help="Тип напоминания: pending_steps — пока не закрыты обязательные шаги.",
     )
     parser.add_argument(
         "--shop-id",

@@ -112,16 +112,31 @@ class RunRecord:
             finished_idx = 18
             phase_map_raw = padded[phase_map_idx]
         elif original_len == expected_len - 1:
-            padded = row + [""] * ((expected_len - 1) - original_len)
-            current_active_idx = None
-            template_open_idx = 10
-            template_close_idx = 11
-            phase_map_idx = 12
-            delta_idx = 13
-            comment_idx = 14
-            version_idx = 15
-            created_idx = 16
-            finished_idx = 17
+            padded = row + [""]
+            # Heuristic: if column 11 looks like a template id (e.g. opening_v1), then the
+            # row comes from the older layout without current_active_user_id. Otherwise
+            # we assume only finished_at is missing.
+            looks_like_template = padded[10] and not padded[10].isdigit()
+            if looks_like_template:
+                current_active_idx = None
+                template_open_idx = 10
+                template_close_idx = 11
+                phase_map_idx = 12
+                delta_idx = 13
+                comment_idx = 14
+                version_idx = 15
+                created_idx = 16
+                finished_idx = 17
+            else:
+                current_active_idx = 10
+                template_open_idx = 11
+                template_close_idx = 12
+                phase_map_idx = 13
+                delta_idx = 14
+                comment_idx = 15
+                version_idx = 16
+                created_idx = 17
+                finished_idx = 18
             phase_map_raw = padded[phase_map_idx]
         else:
             padded = row + [""] * ((expected_len - 2) - original_len)
@@ -168,20 +183,21 @@ class RunRecord:
         self.opener_user_id = user_id
         self.opener_username = username
         self.opener_at = now_iso()
-        if not preserve_status and self.status not in (
-            "in_progress",
-            "ready_to_close",
-            "closed",
-            "returned",
-        ):
-            self.status = "opened"
+        if not preserve_status and self.status != "closed":
+            self.status = "in_progress"
         return self
 
-    def with_closer(self, user_id: str, username: str | None) -> RunRecord:
+    def with_closer(
+        self,
+        user_id: str,
+        username: str | None,
+        *,
+        preserve_status: bool = False,
+    ) -> RunRecord:
         self.closer_user_id = user_id
         self.closer_username = username
         self.closer_at = now_iso()
-        if self.status == "opened":
+        if not preserve_status and self.status != "closed":
             self.status = "in_progress"
         return self
 
@@ -192,6 +208,9 @@ class RunRecord:
                 return template_id
         if phase == "open":
             return self.template_open_id
+        if phase == "continue":
+            # For "continue" phase, fall back to phase_map or use closing template
+            return self.template_phase_map.get("continue", self.template_close_id)
         if phase == "close":
             return self.template_close_id
         return ""

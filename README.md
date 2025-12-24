@@ -33,7 +33,7 @@ RetailCheck — Telegram-бот для ведения сменных чек-ли
 ## Работа с данными
 - `make seed-sheets` заполнит Google Sheet демо-данными (использует `GOOGLE_SHEETS_ID`/`GOOGLE_SERVICE_ACCOUNT_JSON`).
 - `make import-templates` загрузит шаблоны из `templates/opening_v1.json` и `templates/closing_v1.json`.
-- Для кастомизации расписаний напоминаний используйте `tools/reminder_scheduler.py` (два дефолтных слота — открытие −15 мин, закрытие −30 мин), ручные отправки — `tools/send_reminders.py --mode open|close`.
+- Напоминания работают циклично до завершения обязательных шагов: `tools/reminder_scheduler.py` запускает `pending_steps` каждые 5 минут (A: 15/30/45→10 после 18:00, B: 15/25/30→10 после 20:00, закрытие: 10/20/30). Разовая отправка — `tools/send_reminders.py --mode pending_steps`.
 - Скрипты контроля:
   - `tools/delta_alerts.py` — проверка превышения `DELTA_THRESHOLD_RUB` (учитывает `DELTA_ALERT_COOLDOWN_SEC`).
   - `tools/lock_monitor.py` — текущее состояние Redis-локов (`lock:run:*`).

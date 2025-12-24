@@ -1,0 +1,158 @@
+{
+  "template": {
+    "template_id": "continue_v2",
+    "name": "Дневные шаги v2 (роль B)",
+    "version": 2,
+    "phase": "continue",
+    "description": "Дневной чек-лист для closer (B) без стартовых шагов"
+  },
+  "steps": [
+    {
+      "step_order": 1,
+      "code": "cash_check_1",
+      "title": "Сверка остатка №1",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 2,
+      "code": "credit_check_1",
+      "title": "Проверка кредитов №1",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите сумму по кредитам/рассрочкам",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 3,
+      "code": "noncash_check_1",
+      "title": "Сверка безнала №1",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите сумму по безналу",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 4,
+      "code": "cash_check_2",
+      "title": "Сверка остатка №2",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 5,
+      "code": "credit_check_2",
+      "title": "Проверка кредитов №2",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите сумму по кредитам/рассрочкам",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 6,
+      "code": "noncash_check_2",
+      "title": "Сверка безнала №2",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите сумму по безналу",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 7,
+      "code": "cash_check_3",
+      "title": "Сверка остатка №3",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 8,
+      "code": "withdrawal",
+      "title": "Выемка",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите сумму выемки (если была)",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 9,
+      "code": "pko",
+      "title": "ПКО",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите сумму ПКО (если был)",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 10,
+      "code": "photo_statement",
+      "title": "Фото ведомости",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото ведомости",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 11,
+      "code": "photo_acquiring",
+      "title": "Фото эквайринга",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото отчёта эквайринга",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 12,
+      "code": "terminal_choice",
+      "title": "Выбор терминала",
+      "type": "choice",
+      "required": true,
+      "validators_json": "{\"options\":[\"T-Bank\",\"Sberbank\",\"Третий терминал\"]}",
+      "hint": "Выберите Т-Банк, Сбербанк или третий терминал",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 13,
+      "code": "photo_terminal",
+      "title": "Фото терминала",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото сверки выбранного терминала",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 14,
+      "code": "cash_1c",
+      "title": "Остаток по 1С",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите остаток по данным 1С",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 15,
+      "code": "delta_comment",
+      "title": "Комментарий при расхождении",
+      "type": "text",
+      "required": false,
+      "validators_json": "{\"delta_threshold\":300}",
+      "hint": "Обязателен при |Δ| ≥ 300 ₽",
+      "owner_role": "both"
+    }
+  ]
+}

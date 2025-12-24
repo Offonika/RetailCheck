@@ -1,0 +1,29 @@
+{
+  "template": {
+    "template_id": "closing_v3",
+    "name": "Закрытие смены v3 (роль B)",
+    "version": 3,
+    "phase": "close",
+    "description": "Минимальный финал: подтвердить закрытие и загрузить Z-фото"
+  },
+  "steps": [
+    {
+      "step_order": 1,
+      "code": "start_close",
+      "title": "Начать закрытие смены",
+      "type": "check",
+      "required": true,
+      "hint": "Подтвердите начало закрытия смены",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 2,
+      "code": "photo_z_report",
+      "title": "Фото Z-отчёта",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото Z-отчёта (обязательно)",
+      "owner_role": "closer"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import asyncio
 from collections import defaultdict
+from datetime import date
 
 import pytest
 
@@ -72,6 +73,7 @@ async def test_assign_opener_creates_run(run_service: RunService):
     assert result.state == "assigned"
     assert result.run.opener_user_id == "1"
     assert result.run.current_active_user_id == "1"
+    assert result.run.status == "in_progress"
 
 
 @pytest.mark.asyncio
@@ -81,6 +83,7 @@ async def test_assign_opener_same_user(run_service: RunService):
     result = await run_service.assign_role("shop_1", "open", user)
     assert result.state == "already_holder"
     assert result.run.current_active_user_id == "1"
+    assert result.run.status == "in_progress"
 
 
 @pytest.mark.asyncio
@@ -108,3 +111,47 @@ async def test_assign_closer(run_service: RunService):
     assert result.state == "assigned"
     assert result.run.closer_user_id == "2"
     assert result.run.current_active_user_id == "2"
+    assert result.run.status == "in_progress"
+
+
+@pytest.mark.asyncio
+async def test_assign_opener_after_return_resets_status(run_service: RunService):
+    repo = run_service._repository  # type: ignore[attr-defined]
+    today = date.today().isoformat()
+    record = RunRecord(
+        run_id="run_returned",
+        date=today,
+        shop_id="shop_1",
+        status="returned",
+    )
+    await repo.save_run(record)
+    user = RunUser(user_id=5, username="tester", full_name="Tester")
+    result = await run_service.assign_role("shop_1", "open", user)
+    assert result.state == "assigned"
+    assert result.run.status == "in_progress"
+    assert result.run.current_active_user_id == "5"
+
+
+@pytest.mark.asyncio
+async def test_return_run_clears_finish_and_active(run_service: RunService):
+    repo = run_service._repository  # type: ignore[attr-defined]
+    today = date.today().isoformat()
+    record = RunRecord(
+        run_id="run_closed",
+        date=today,
+        shop_id="shop_1",
+        status="closed",
+        opener_user_id="1",
+        closer_user_id="2",
+        delta_rub="50.0",
+        finished_at="2025-02-01T22:00:00Z",
+        current_active_user_id="2",
+    )
+    await repo.save_run(record)
+    actor = RunUser(user_id=99, username="manager", full_name="Manager")
+    returned = await run_service.return_run("shop_1", actor, "Нет Z")
+    assert returned.status == "returned"
+    assert returned.delta_rub is None
+    assert returned.finished_at is None
+    assert returned.current_active_user_id is None
+    assert returned.comment == "Нет Z"

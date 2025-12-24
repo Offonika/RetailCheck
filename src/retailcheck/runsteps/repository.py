@@ -21,7 +21,7 @@ class RunStepsRepository:
     # ---- sync helpers --------------------------------------------------
 
     def _list_sync(self, run_id: str) -> list[RunStepRecord]:
-        values = self._sheets.read("RunSteps!A2:M")
+        values = self._sheets.read("RunSteps!A2:N")
         result = []
         for row in values:
             if not row or not row[0]:
@@ -31,16 +31,24 @@ class RunStepsRepository:
         return result
 
     def _upsert_sync(self, records: list[RunStepRecord]) -> None:
-        current_rows = self._sheets.read("RunSteps!A2:M")
-        existing: dict[tuple[str, str, str], RunStepRecord] = {}
+        # WARNING: This method uses read-modify-write pattern without locking.
+        # Concurrent updates to different records may cause data loss.
+        # For production, consider adding Redis locks or using optimistic locking.
+        current_rows = self._sheets.read("RunSteps!A2:N")
+        existing: dict[tuple[str, str, str, str], RunStepRecord] = {}
         for row in current_rows:
             if not row or not row[0]:
                 continue
             record = RunStepRecord.from_row(row)
-            existing[(record.run_id, record.phase, record.step_code)] = record
+            # Normalize owner_role to prevent None from causing key mismatches
+            owner_role = (record.owner_role or "shared").lower()
+            existing[(record.run_id, record.phase, record.step_code, owner_role)] = record
 
         for record in records:
-            existing[(record.run_id, record.phase, record.step_code)] = record
+            # Normalize owner_role consistently
+            owner_role = (record.owner_role or "shared").lower()
+            key = (record.run_id, record.phase, record.step_code, owner_role)
+            existing[key] = record
 
         rows = [RUN_STEP_HEADERS]
         for record in existing.values():

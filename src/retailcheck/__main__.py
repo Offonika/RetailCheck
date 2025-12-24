@@ -52,6 +52,7 @@ async def main() -> None:
         lock_ttl=config.run.lock_ttl_sec,
         audit_repository=audit_repo,
         run_scope=config.run.scope,
+        runsteps_repository=runsteps_repo,
     )
 
     storage = MemoryStorage()

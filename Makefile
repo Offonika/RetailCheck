@@ -1,4 +1,5 @@
 POETRY ?= poetry
+export PYTHONPATH := src
 
 .PHONY: install
 install:
@@ -27,7 +28,7 @@ seed-sheets:
 
 .PHONY: import-templates
 import-templates:
-	$(POETRY) run python tools/import_templates.py templates/opening_v1.json templates/closing_v1.json
+	$(POETRY) run python tools/import_templates.py templates/opening_v3.json templates/continue_v2.json templates/closing_v3.json
 
 .PHONY: run
 run:
@@ -35,7 +36,7 @@ run:
 
 .PHONY: reminders
 reminders:
-	$(POETRY) run python tools/send_reminders.py --slot $(slot)
+	$(POETRY) run python tools/send_reminders.py --mode pending_steps $(if $(shop),--shop-id $(shop),)
 
 .PHONY: reminders-scheduler
 reminders-scheduler:

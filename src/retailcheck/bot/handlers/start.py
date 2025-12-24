@@ -3,6 +3,7 @@ from __future__ import annotations
 from math import ceil
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
@@ -42,6 +43,16 @@ def _resolve_callback_message(message: Message | InaccessibleMessage | None) -> 
     if message is None or isinstance(message, InaccessibleMessage):
         return None
     return message
+
+
+async def _remove_actions_keyboard(message: Message | InaccessibleMessage | None) -> None:
+    message_obj = _resolve_callback_message(message)
+    if message_obj is None:
+        return
+    try:
+        await message_obj.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest:
+        pass
 
 
 async def _require_user(message: Message) -> TelegramUser | None:
@@ -126,7 +137,15 @@ async def handle_start(
         )
         return
     except RunNotFoundError:
-        await message.answer(t("start.run_missing"))
+        # For closer role, run must exist (created by opener first)
+        # For open role, this shouldn't happen as opener creates the run
+        if role == "close":
+            await message.answer(
+                t("start.run_missing") + " "
+                "Сначала должен быть открыт run (назначен opener)."
+            )
+        else:
+            await message.answer(t("start.run_missing"))
         return
     except ValueError:
         await message.answer(t("start.invalid_link"))
@@ -209,7 +228,9 @@ async def handle_start_callback(
             await callback.answer(t("common.invalid_command"), show_alert=True)
             return
         shop_id = rest[0]
-        phase = "open" if action == "open" else "close"
+        # Map action to phase: open→open, continue→continue, close→close
+        phase_mapping = {"open": "open", "continue": "continue", "close": "close"}
+        phase = phase_mapping[action]
         await _start_steps_flow(
             message_obj,
             run_service,
@@ -219,7 +240,9 @@ async def handle_start_callback(
             users_repository,
             phase=phase,
             shop_override=shop_id,
+            actor=callback.from_user,
         )
+        await _remove_actions_keyboard(callback.message)
         await callback.answer()
         return
     await callback.answer(t("common.invalid_command"), show_alert=True)

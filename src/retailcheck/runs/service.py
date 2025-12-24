@@ -12,6 +12,7 @@ from retailcheck.audit.repository import AuditRepository
 from retailcheck.config import TemplateDefaults
 from retailcheck.runs.models import RunRecord, now_iso
 from retailcheck.runs.repository import RunsRepository
+from retailcheck.runsteps.repository import RunStepsRepository
 
 
 class RunNotFoundError(Exception):
@@ -52,6 +53,7 @@ class RunService:
         lock_ttl: int = 10,
         audit_repository: AuditRepository | None = None,
         run_scope: str = "shop_id_date",
+        runsteps_repository: RunStepsRepository | None = None,
     ) -> None:
         self._repository = repository
         self._redis = redis
@@ -59,6 +61,7 @@ class RunService:
         self._lock_ttl = lock_ttl
         self._audit_repo = audit_repository
         self._run_scope = run_scope
+        self._runsteps_repo = runsteps_repository
 
     async def assign_role(self, shop_id: str, role: str, user: RunUser) -> RoleAssignmentResult:
         if role not in ("open", "close"):
@@ -138,17 +141,26 @@ class RunService:
         return await self._repository.get_run(shop_id, today)
 
     async def finalize_run(self, run_id: str, delta_total: float) -> RunRecord:
-        runs = await self._repository.list_runs()
-        run = next((r for r in runs if r.run_id == run_id), None)
-        if not run:
-            raise RunNotFoundError(run_id)
-        self._ensure_phase_map(run)
-        run.status = "closed"
-        run.delta_rub = f"{delta_total:.2f}"
-        run.finished_at = now_iso()
-        run.current_active_user_id = None
-        await self._repository.save_run(run)
-        return run
+        # Use lock to prevent concurrent finalization attempts
+        lock_key = f"lock:finalize:{run_id}"
+        lock = self._redis.lock(lock_key, timeout=self._lock_ttl)
+        async with lock:
+            await self._log_lock_acquired(lock)
+            runs = await self._repository.list_runs()
+            run = next((r for r in runs if r.run_id == run_id), None)
+            if not run:
+                raise RunNotFoundError(run_id)
+            # Prevent finalizing already closed runs
+            if run.status == "closed":
+                logger.warning("Attempt to finalize already closed run %s", run_id)
+                return run
+            self._ensure_phase_map(run)
+            run.status = "closed"
+            run.delta_rub = f"{delta_total:.2f}"
+            run.finished_at = now_iso()
+            run.current_active_user_id = None
+            await self._repository.save_run(run)
+            return run
 
     async def handover_role(self, shop_id: str, role: str, user: RunUser) -> RunRecord:
         if role not in ("open", "close"):
@@ -165,7 +177,7 @@ class RunService:
             if role == "open":
                 run.with_opener(str(user.user_id), user.username, preserve_status=True)
             else:
-                run.with_closer(str(user.user_id), user.username)
+                run.with_closer(str(user.user_id), user.username, preserve_status=True)
             self._set_active_user(run, user)
             await self._repository.save_run(run)
             return run
@@ -206,9 +218,13 @@ class RunService:
         self._ensure_phase_map(run)
         run.status = "returned"
         run.current_active_user_id = None
+        run.finished_at = None
+        run.delta_rub = None
         if reason:
             run.comment = reason
         await self._repository.save_run(run)
+        await self._reset_reminder_state(run.run_id)
+        await self._mark_steps_as_error(run)
         await self._append_audit(
             action="return_run",
             run=run,
@@ -216,6 +232,21 @@ class RunService:
             user_id=str(actor.user_id),
         )
         return run
+
+    async def mark_ready_to_close(self, run_id: str) -> RunRecord:
+        lock_key = f"lock:ready:{run_id}"
+        lock = self._redis.lock(lock_key, timeout=self._lock_ttl)
+        async with lock:
+            await self._log_lock_acquired(lock)
+            runs = await self._repository.list_runs()
+            run = next((r for r in runs if r.run_id == run_id), None)
+            if not run:
+                raise RunNotFoundError(run_id)
+            self._ensure_phase_map(run)
+            if run.status != "closed":
+                run.status = "ready_to_close"
+                await self._repository.save_run(run)
+            return run
 
     async def _log_lock_acquired(self, lock) -> None:
         lock_name = getattr(lock, "name", None)
@@ -281,3 +312,25 @@ class RunService:
             user_id=user_id,
         )
         await self._audit_repo.append(record)
+
+    async def _mark_steps_as_error(self, run: RunRecord) -> None:
+        if not self._runsteps_repo:
+            return
+        steps = await self._runsteps_repo.list_for_run(run.run_id)
+        to_update = []
+        now = now_iso()
+        for step in steps:
+            if step.status == "ok":
+                continue
+            step.status = "error"
+            step.updated_at = now
+            to_update.append(step)
+        if to_update:
+            await self._runsteps_repo.upsert(to_update)
+
+    async def _reset_reminder_state(self, run_id: str) -> None:
+        if not hasattr(self._redis, "scan_iter"):
+            return
+        pattern = f"reminder_state:*:{run_id}"
+        async for key in self._redis.scan_iter(match=pattern):
+            await self._redis.delete(key)

@@ -55,7 +55,7 @@ def write_templates(client: SheetsClient, templates: list[TemplateDefinition]) -
 
 
 def _validate_templates(templates: list[TemplateDefinition]) -> None:
-    phases = {"open", "close"}
+    phases = {"open", "close", "continue"}
     seen_ids: set[str] = set()
     for tmpl in templates:
         if tmpl.template_id in seen_ids:

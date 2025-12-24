@@ -1,1 +1,1 @@
-run_id,phase,step_code,owner_role,value_number,value_text,value_check,delta_number,comment,performer_user_id,status,updated_at,idempotency_key
+run_id,phase,step_code,owner_role,value_number,value_text,value_check,delta_number,comment,performer_user_id,status,started_at,updated_at,idempotency_key

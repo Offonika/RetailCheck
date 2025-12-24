@@ -1,0 +1,207 @@
+{
+  "template": {
+    "template_id": "opening_v2",
+    "name": "Открытие смены v2 (роль A)",
+    "version": 2,
+    "phase": "open",
+    "description": "Полный набор шагов для открывающего (A): 9:00–18:00"
+  },
+  "steps": [
+    {
+      "step_order": 1,
+      "code": "start_open",
+      "title": "Начало смены",
+      "type": "check",
+      "required": true,
+      "hint": "Подтвердите начало смены",
+      "owner_role": "opener"
+    },
+    {
+      "step_order": 2,
+      "code": "photo_x_report",
+      "title": "Фото X-отчёта",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото X-отчёта при открытии",
+      "owner_role": "opener"
+    },
+    {
+      "step_order": 3,
+      "code": "cash_start",
+      "title": "Начальный остаток кассы",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите сумму в кассе на начало дня",
+      "owner_role": "opener"
+    },
+    {
+      "step_order": 4,
+      "code": "cash_check_1",
+      "title": "Сверка кассы №1",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 5,
+      "code": "cash_check_2",
+      "title": "Сверка кассы №2",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 6,
+      "code": "cash_check_3",
+      "title": "Сверка кассы №3",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите текущую сумму в кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 7,
+      "code": "ds_balance",
+      "title": "Остаток ДС (денежные средства)",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите остаток денежных средств",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 8,
+      "code": "noncash_sber",
+      "title": "Безнал Сбербанк",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите сумму по терминалу Сбербанк",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 9,
+      "code": "noncash_tbank",
+      "title": "Безнал Т-Банк",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите сумму по терминалу Т-Банк",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 10,
+      "code": "acquiring_total",
+      "title": "Итого эквайринг",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":1000000}",
+      "hint": "Введите общую сумму по терминалам",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 11,
+      "code": "photo_terminal_sber",
+      "title": "Фото сверки Сбербанк",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото сверки терминала Сбербанк",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 12,
+      "code": "photo_terminal_tbank",
+      "title": "Фото сверки Т-Банк",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото сверки терминала Т-Банк",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 13,
+      "code": "stock_check",
+      "title": "Проверка остатков товара",
+      "type": "check",
+      "required": true,
+      "hint": "Подтвердите проверку остатков",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 14,
+      "code": "photo_storefront",
+      "title": "Фото витрины/зала",
+      "type": "photo",
+      "required": false,
+      "hint": "Загрузите фото при изменениях",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 15,
+      "code": "returns_check",
+      "title": "Проверка возвратов",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":100000}",
+      "hint": "Введите сумму возвратов (если были)",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 16,
+      "code": "encashment",
+      "title": "Инкассация",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите сумму инкассации (если была)",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 17,
+      "code": "safe_balance",
+      "title": "Остаток в сейфе",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите остаток в сейфе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 18,
+      "code": "cash_expected",
+      "title": "Ожидаемый остаток кассы",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Расчётная сумма по кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 19,
+      "code": "cash_actual",
+      "title": "Фактический остаток кассы",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000,\"delta_threshold\":300}",
+      "hint": "Введите фактическую сумму в кассе",
+      "owner_role": "both"
+    },
+    {
+      "step_order": 20,
+      "code": "delta_comment_a",
+      "title": "Комментарий по расхождению (A)",
+      "type": "text",
+      "required": false,
+      "validators_json": "{\"delta_threshold\":300}",
+      "hint": "Обязателен при расхождении ≥ 300₽",
+      "owner_role": "opener"
+    }
+  ]
+}
+
+

@@ -11,6 +11,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
+from loguru import logger
 
 from retailcheck.attachments.repository import AttachmentRepository
 from retailcheck.audit.models import AuditRecord
@@ -271,14 +272,7 @@ async def handle_return_run(
         shops_repository,
         users_repository,
     )
-    manager_display = user.username or user.full_name or str(user.id)
-    await _broadcast_shop_update(
-        message.bot,
-        shop_id,
-        f"Менеджер @{manager_display} вернул смену {shop_id}: {reason}",
-        shops_repository,
-        users_repository,
-    )
+    await _notify_return_to_performers(message.bot, run, reason)
 
 
 @router.callback_query(F.data.startswith("mgr:"))
@@ -428,6 +422,7 @@ async def handle_manager_callback(
             shops_repository,
             users_repository,
         )
+        await _notify_return_to_performers(message_obj.bot, run, reason)
         await callback.answer(t("common.action_done"))
         return
     if action == "exportday":
@@ -577,6 +572,29 @@ async def _broadcast_shop_update(
         manager_ids = dispatcher.get("manager_notify_chat_ids", [])
     shop_ids = await collect_shop_chat_ids(shop_id, shops_repository, users_repository)
     await broadcast_to_targets(bot, text, manager_ids, shop_ids)
+
+
+async def _notify_return_to_performers(bot, run, reason: str) -> None:
+    if bot is None:
+        return
+    text = (
+        f"Смена {run.shop_id} за {run.date} возвращена менеджером.\n"
+        f"Причина: {reason}\n"
+        "Нажмите /start → нужный магазин, чтобы продолжить и исправить шаги."
+    )
+    recipients: set[int] = set()
+    for user_id in (run.opener_user_id, run.closer_user_id):
+        if not user_id:
+            continue
+        try:
+            recipients.add(int(user_id))
+        except (TypeError, ValueError):
+            logger.warning("Cannot notify performer %s about return", user_id)
+    for tg_id in recipients:
+        try:
+            await bot.send_message(tg_id, text)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to notify performer %s: %s", tg_id, exc)
 
 
 def _manager_name(user) -> str:

@@ -1,9 +1,75 @@
 template_id,step_order,code,title,type,required,validators_json,norm_rule,hint,owner_role
-opening_v1,1,cash_float_open,"Сверка кассы при открытии",number,TRUE,"{""min"":0,""max"":200000}","constant:previous_close","Введите фактическую сумму кассы",opener
-opening_v1,2,pos_terminals_ready,"Проверка терминалов",check,TRUE,,,"Отметьте готовность POS-терминалов",opener
-opening_v1,3,storefront_photo,"Фото витрины/зала",photo,FALSE,,,"Загрузите фото, если есть изменения",opener
-closing_v1,1,cash_1900,"Касса 19:00",number,TRUE,"{""min"":0,""max"":200000}","reference:cash_float_open","Ожидаемая сумма = открытие + продажи",closer
-closing_v1,2,pos_sber,"Терминал Сбер",number,TRUE,"{""min"":0,""max"":200000}","reference:pos_terminals_ready","",closer
-closing_v1,3,pos_tbank,"Терминал Т-Банк",number,FALSE,"{""min"":0,""max"":200000}",,"",closer
-closing_v1,4,z_report_photo,"Фото Z-отчёта",photo,TRUE,,,"Минимум одно фото Z-отчёта",closer
-closing_v1,5,delta_comment,"Комментарий по расхождениям",text,FALSE,"{""delta_threshold"":300}",,"Обязателен автоматически при |Δ| ≥ 300 ₽",closer
+opening_v2,1,start_open,"Начало смены",check,TRUE,,,"Подтвердите начало смены",opener
+opening_v2,2,photo_x_report,"Фото X-отчёта",photo,TRUE,,,"Загрузите фото X-отчёта при открытии",opener
+opening_v2,3,cash_start,"Начальный остаток кассы",number,TRUE,"{""min"":0,""max"":500000}",,"Введите сумму в кассе на начало дня",opener
+opening_v2,4,cash_check_1,"Сверка кассы №1",number,TRUE,"{""min"":0,""max"":500000}",,"Введите текущую сумму в кассе",both
+opening_v2,5,cash_check_2,"Сверка кассы №2",number,TRUE,"{""min"":0,""max"":500000}",,"Введите текущую сумму в кассе",both
+opening_v2,6,cash_check_3,"Сверка кассы №3",number,TRUE,"{""min"":0,""max"":500000}",,"Введите текущую сумму в кассе",both
+opening_v2,7,ds_balance,"Остаток ДС",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите остаток денежных средств",both
+opening_v2,8,noncash_sber,"Безнал Сбербанк",number,TRUE,"{""min"":0,""max"":500000}",,"Введите сумму по терминалу Сбербанк",both
+opening_v2,9,noncash_tbank,"Безнал Т-Банк",number,TRUE,"{""min"":0,""max"":500000}",,"Введите сумму по терминалу Т-Банк",both
+opening_v2,10,acquiring_total,"Итого эквайринг",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите общую сумму по терминалам",both
+opening_v2,11,photo_terminal_sber,"Фото сверки Сбербанк",photo,TRUE,,,"Загрузите фото сверки терминала Сбербанк",both
+opening_v2,12,photo_terminal_tbank,"Фото сверки Т-Банк",photo,TRUE,,,"Загрузите фото сверки терминала Т-Банк",both
+opening_v2,13,stock_check,"Проверка остатков товара",check,TRUE,,,"Подтвердите проверку остатков",both
+opening_v2,14,photo_storefront,"Фото витрины/зала",photo,FALSE,,,"Загрузите фото при изменениях",both
+opening_v2,15,returns_check,"Проверка возвратов",number,FALSE,"{""min"":0,""max"":100000}",,"Введите сумму возвратов (если были)",both
+opening_v2,16,encashment,"Инкассация",number,FALSE,"{""min"":0,""max"":500000}",,"Введите сумму инкассации (если была)",both
+opening_v2,17,safe_balance,"Остаток в сейфе",number,FALSE,"{""min"":0,""max"":500000}",,"Введите остаток в сейфе",both
+opening_v2,18,cash_expected,"Ожидаемый остаток кассы",number,TRUE,"{""min"":0,""max"":500000}",,"Расчётная сумма по кассе",both
+opening_v2,19,cash_actual,"Фактический остаток кассы",number,TRUE,"{""min"":0,""max"":500000,""delta_threshold"":300}",,"Введите фактическую сумму в кассе",both
+opening_v2,20,delta_comment_a,"Комментарий по расхождению (A)",text,FALSE,"{""delta_threshold"":300}",,"Обязателен при расхождении ≥ 300₽",opener
+continue_v1,1,start_continue,"Продолжение смены",check,TRUE,,,"Подтвердите начало работы (B)",closer
+continue_v1,2,cash_check_1,"Сверка кассы №1",number,TRUE,"{""min"":0,""max"":500000}",,"Введите текущую сумму в кассе",closer
+continue_v1,3,cash_check_2,"Сверка кассы №2",number,TRUE,"{""min"":0,""max"":500000}",,"Введите текущую сумму в кассе",closer
+continue_v1,4,cash_check_3,"Сверка кассы №3",number,TRUE,"{""min"":0,""max"":500000}",,"Введите текущую сумму в кассе",closer
+continue_v1,5,ds_balance,"Остаток ДС",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите остаток денежных средств",closer
+continue_v1,6,noncash_sber,"Безнал Сбербанк",number,TRUE,"{""min"":0,""max"":500000}",,"Введите сумму по терминалу Сбербанк",closer
+continue_v1,7,noncash_tbank,"Безнал Т-Банк",number,TRUE,"{""min"":0,""max"":500000}",,"Введите сумму по терминалу Т-Банк",closer
+continue_v1,8,acquiring_total,"Итого эквайринг",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите общую сумму по терминалам",closer
+continue_v1,9,photo_terminal_sber,"Фото сверки Сбербанк",photo,TRUE,,,"Загрузите фото сверки терминала Сбербанк",closer
+continue_v1,10,photo_terminal_tbank,"Фото сверки Т-Банк",photo,TRUE,,,"Загрузите фото сверки терминала Т-Банк",closer
+continue_v1,11,stock_check,"Проверка остатков товара",check,TRUE,,,"Подтвердите проверку остатков",closer
+continue_v1,12,photo_storefront,"Фото витрины/зала",photo,FALSE,,,"Загрузите фото при изменениях",closer
+continue_v1,13,returns_check,"Проверка возвратов",number,FALSE,"{""min"":0,""max"":100000}",,"Введите сумму возвратов (если были)",closer
+continue_v1,14,encashment,"Инкассация",number,FALSE,"{""min"":0,""max"":500000}",,"Введите сумму инкассации (если была)",closer
+closing_v2,1,start_close,"Начало закрытия",check,TRUE,,,"Подтвердите начало закрытия смены",closer
+closing_v2,2,cash_final,"Итоговый остаток кассы",number,TRUE,"{""min"":0,""max"":500000,""delta_threshold"":300}",,"Введите фактическую сумму в кассе на закрытие",closer
+closing_v2,3,safe_balance_close,"Остаток в сейфе на закрытие",number,FALSE,"{""min"":0,""max"":500000}",,"Введите остаток в сейфе",closer
+closing_v2,4,photo_z_report,"Фото Z-отчёта",photo,TRUE,,,"Загрузите фото Z-отчёта (обязательно!)",closer
+closing_v2,5,delta_comment_b,"Комментарий по расхождению (B)",text,FALSE,"{""delta_threshold"":300}",,"Обязателен при расхождении ≥ 300₽",closer
+closing_v2,6,summary_confirm,"Подтверждение итога",check,TRUE,,,"Подтвердите корректность всех данных смены",closer
+opening_v3,1,cash_start,"Начальный остаток кассы",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму в кассе на начало дня",opener
+opening_v3,2,photo_x_report,"Фото X-отчёта",photo,TRUE,,,"Загрузите фото X-отчёта при открытии",opener
+opening_v3,3,cash_check_1,"Сверка остатка №1",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите текущую сумму в кассе",both
+opening_v3,4,credit_check_1,"Проверка кредитов №1",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по кредитам/рассрочкам",both
+opening_v3,5,noncash_check_1,"Сверка безнала №1",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по безналу",both
+opening_v3,6,cash_check_2,"Сверка остатка №2",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите текущую сумму в кассе",both
+opening_v3,7,credit_check_2,"Проверка кредитов №2",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по кредитам/рассрочкам",both
+opening_v3,8,noncash_check_2,"Сверка безнала №2",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по безналу",both
+opening_v3,9,cash_check_3,"Сверка остатка №3",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите текущую сумму в кассе",both
+opening_v3,10,withdrawal,"Выемка",number,FALSE,"{""min"":0,""max"":1000000}",,"Введите сумму выемки (если была)",both
+opening_v3,11,pko,"ПКО",number,FALSE,"{""min"":0,""max"":1000000}",,"Введите сумму ПКО (если был)",both
+opening_v3,12,photo_statement,"Фото ведомости",photo,TRUE,,,"Загрузите фото ведомости",both
+opening_v3,13,photo_acquiring,"Фото эквайринга",photo,TRUE,,,"Загрузите фото отчёта эквайринга",both
+opening_v3,14,terminal_choice,"Выбор терминала",choice,TRUE,"{""options"":[""T-Bank"",""Sberbank"",""Третий терминал""]}",,"Выберите Т-Банк, Сбербанк или третий терминал",both
+opening_v3,15,photo_terminal,"Фото терминала",photo,TRUE,,,"Загрузите фото сверки выбранного терминала",both
+opening_v3,16,cash_1c,"Остаток по 1С",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите остаток по данным 1С",both
+opening_v3,17,delta_comment,"Комментарий при расхождении",text,FALSE,"{""delta_threshold"":300}",,"Обязателен при |Δ| ≥ 300 ₽",both
+continue_v2,1,cash_check_1,"Сверка остатка №1",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите текущую сумму в кассе",both
+continue_v2,2,credit_check_1,"Проверка кредитов №1",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по кредитам/рассрочкам",both
+continue_v2,3,noncash_check_1,"Сверка безнала №1",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по безналу",both
+continue_v2,4,cash_check_2,"Сверка остатка №2",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите текущую сумму в кассе",both
+continue_v2,5,credit_check_2,"Проверка кредитов №2",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по кредитам/рассрочкам",both
+continue_v2,6,noncash_check_2,"Сверка безнала №2",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите сумму по безналу",both
+continue_v2,7,cash_check_3,"Сверка остатка №3",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите текущую сумму в кассе",both
+continue_v2,8,withdrawal,"Выемка",number,FALSE,"{""min"":0,""max"":1000000}",,"Введите сумму выемки (если была)",both
+continue_v2,9,pko,"ПКО",number,FALSE,"{""min"":0,""max"":1000000}",,"Введите сумму ПКО (если был)",both
+continue_v2,10,photo_statement,"Фото ведомости",photo,TRUE,,,"Загрузите фото ведомости",both
+continue_v2,11,photo_acquiring,"Фото эквайринга",photo,TRUE,,,"Загрузите фото отчёта эквайринга",both
+continue_v2,12,terminal_choice,"Выбор терминала",choice,TRUE,"{""options"":[""T-Bank"",""Sberbank"",""Третий терминал""]}",,"Выберите Т-Банк, Сбербанк или третий терминал",both
+continue_v2,13,photo_terminal,"Фото терминала",photo,TRUE,,,"Загрузите фото сверки выбранного терминала",both
+continue_v2,14,cash_1c,"Остаток по 1С",number,TRUE,"{""min"":0,""max"":1000000}",,"Введите остаток по данным 1С",both
+continue_v2,15,delta_comment,"Комментарий при расхождении",text,FALSE,"{""delta_threshold"":300}",,"Обязателен при |Δ| ≥ 300 ₽",both
+closing_v3,1,start_close,"Начало закрытия смены",check,TRUE,,,"Подтвердите начало закрытия смены",closer
+closing_v3,2,photo_z_report,"Фото Z-отчёта",photo,TRUE,,,"Загрузите фото Z-отчёта (обязательно)",closer

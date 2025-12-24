@@ -16,6 +16,7 @@
 3. `poetry run python tools/seed_sheets.py` — заполнение демо-данных.
 4. `/start shop_1__open` → проход шагов `open`, загрузка фото, проверка Audit.
 5. `/start shop_1__close` → закрытие смены, `/summary shop_1`.
+6. Шаги `terminal_choice`/`photo_terminal`: выбрать терминал (Т-Банк/Сбербанк/третий), затем загрузить одно фото сверки выбранного терминала; без выбора/фото шаг не закрывается (проверить для opener и closer отдельно).
 
 ## 3. Регрессионные сценарии
 - `/handover shop_1 open @username`.

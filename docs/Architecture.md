@@ -14,7 +14,7 @@
 | --- | --- | --- | --- |
 | Telegram Bot Service | Диалоговое ядро: шаги чек-листа, валидации, статусы Runs | Python 3.11, Aiogram/pyTelegramBotAPI, Pydantic, Redis (опционально для FSM) | Живёт в Docker/systemd; webhook режим |
 | Webhook Gateway | Приём HTTPS и проксирование в бота | Nginx или Apache | Транслирует `https://bot.offonika.ru/checklist/webhook` на локальный порт |
-| Google Sheets Sync | Чтение/запись данных чек-листов | Google Sheets API v4, google-auth | Пакетные batchUpdate, ретраи 429/5xx |
+| Google Sheets Sync | Чтение/запись данных чек-листов | Google Sheets API v4, google-auth | Пакетные batchUpdate, ретраи 429/5xx, логирование BrokenPipe/таймаутов и алерт при исчерпании попыток |
 | Scheduler & Alerts | Крон/фоновые задачи для напоминаний и дельт | APScheduler (см. `tools/reminder_scheduler.py`) + Redis | Работает как часть сервиса или отдельным воркером |
 | Export Builder | Генерация листа `Export` по кнопке | Python job, Google Sheets API | Формирует плоские строки за день/неделю |
 | Audit Logger | Протоколирование действий в лист `Audit` | Обёртка над Sheets Sync | Каждое важное событие → запись в Audit |

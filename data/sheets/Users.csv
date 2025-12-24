@@ -1,5 +1,6 @@
 user_id,tg_id,username,fio,role,shops,is_active,created_at,updated_at
 usr_manager_1,900001,manager_shop1,"Белла М.",manager,"shop_1,shop_2",TRUE,2025-01-10T09:00:00Z,
+usr_bela,755543399,bela1502,"Белла А.",manager,"shop_1,shop_2",TRUE,2025-01-10T09:30:00Z,
 usr_zuhra,900101,Zuuuuhra99,"Зухра А.",employee,"shop_1,shop_2",TRUE,2025-01-10T10:00:00Z,
 usr_lisa,900102,o_lisaaaa,"Лиза О.",employee,"shop_1,shop_2",TRUE,2025-01-10T10:05:00Z,
 usr_asad,900103,Asad_Ikaev,"Асад И.",employee,"shop_1,shop_2",TRUE,2025-01-10T10:10:00Z,

@@ -26,10 +26,10 @@
 - `shop_id, name, timezone, open_time, close_time, manager_usernames, employee_usernames, reminder_slots, allow_anyone (TRUE|FALSE), dual_cash_mode (TRUE|FALSE), is_active`
   - `timezone` — идентификатор из базы IANA (`Europe/Moscow`). Используется для расчёта напоминаний и конвертации дат.
   - `open_time` / `close_time` — плановые часы магазина в формате HH:MM (локальная таймзона).
-  - `reminder_slots` — опциональный JSON (например, `{"dual_checks":["12:00","13:00","13:30","15:00","16:00","16:30","17:30"]}`) для магазинов с двумя кассами. Если пусто, используем дефолтные напоминания `open_time−15` и `close_time−30`.
+- `reminder_slots` — зарезервировано под будущие overrides; текущие напоминания считаются от фактического старта ролей и не зависят от этого поля.
   - `allow_anyone=FALSE` по умолчанию. Значение `TRUE` используем только для тестовых магазинов; рабочие магазины требуют явного перечисления `telegram_username` в manager/employee списках.
   - `dual_cash_mode` — включает режим двух касс (opener и closer ведут параллельные шаги). По умолчанию `FALSE`.
-  - Кросс-замены фиксируем через пересекающиеся `employee_usernames`: например, `@Zuuuuhra99` и `@o_lisaaaa` добавлены в оба магазина, чтобы подменять коллег; аналогично `@a1III11`/`@VviVkk` могут выходить в магазине 1.
+- Кросс-замены фиксируем через пересекающиеся `employee_usernames`: например, `@Zuuuuhra99` и `@o_lisaaaa` добавлены в оба магазина, чтобы подменять коллег; аналогично `@a1III11`/`@VviVkk` могут выходить в магазине 1, а `@bela1502` прописан в обоих списках и как менеджер, и как сотрудник (fallback на открытие/закрытие).
   - Обновление whitelists/менеджеров выполняется напрямую в листе `Shops` (бот перечитывает список перед назначением ролей).
 
 ## Templates
@@ -39,7 +39,7 @@
 | template_id | string | ✔ | Идентификатор шаблона (e.g. `evening_shift_v1`). |
 | name | string | ✔ | Название («Открытие», «Закрытие»). |
 | version | int | ✔ | Версия шаблона. Рост версии = миграция. |
-| phase | enum(open, check_1100, check_1600, check_1900, close, finance) | ✔ | Какой фазе смены соответствует шаблон/блок. |
+| phase | enum(open, continue, close) | ✔ | Какой фазе смены соответствует шаблон/блок (дневные шаги A/B или финальное закрытие). |
 | is_active | bool | ✔ | Флаг доступности. |
 | description | string | | Комментарий / заметки по шаблону. |
 
@@ -51,20 +51,21 @@
 | step_order | int | ✔ | Порядок отображения (1..N). |
 | code | string | ✔ | Уникальный код шага (`cash_16`, `pos_sber`). |
 | title | string | ✔ | Текст шага для пользователя. |
-| type | enum(number, text, check, photo) | ✔ | Тип ввода. |
+| type | enum(number, text, check, photo, choice) | ✔ | Тип ввода. |
 | required | bool | ✔ | Обязательность шага. |
 | validators_json | string | | JSON с правилами (`min`, `max`, `regex`, `delta_threshold`). |
 | norm_rule | string | | Определение нормы (константа, ссылочный шаг, ручной ввод). |
 | hint | string | | Дополнительная подсказка. |
-| owner_role | enum(opener, closer, shared) | | Какая роль должна видеть шаг. Пустое значение трактуем как `shared`. |
+| owner_role | enum(opener, closer, shared, both) | | Какая роль должна видеть шаг. `both` = шаг дублируется для A и B (отдельные RunSteps по одному на роль), пустое значение трактуем как `shared`. |
 
-Пилотный шаблон состоит из четырёх фаз и повторяющихся дневных сверок:
-- `open`: `open_checkin`, `open_pos_check`, `open_cash_start`, `open_note`.
-- `check_1100`, `check_1600`, `check_1900`: `chkXXXX_start`, `chkXXXX_sum`, `chkXXXX_receipts`, `chkXXXX_non_cash`, `chkXXXX_comment`.
-- `close`: `close_start`, `close_done_1c`, `close_form_receipt`, `close_z_sum`, `close_cash_end`, `close_cash_move`, `close_comment`.
-- `finance`: `fin_receipts_photo`, `fin_report_dc1c`, `fin_z_photo`, `fin_sberbank_sum`, `fin_tbank_sum`, `fin_comment`.
+Пилотный шаблон состоит из дневного блока и финального закрытия:
+- `open` (opener) + общие шаги (`owner_role = both`): `cash_start`, `photo_x_report`, `cash_check_1/2/3`, `credit_check_1/2`, `noncash_check_1/2`, `withdrawal`, `pko`, `photo_statement`, `photo_acquiring`, `terminal_choice`, `photo_terminal`, `cash_1c`, `delta_comment`.
+- `continue` (closer дневной): такой же список, но без `cash_start` и `photo_x_report` (остальные шаги имеют `owner_role = both`, чтобы A и B проходили их отдельно).
+- `close`: `start_close`, `photo_z_report`.
 
-Для магазинов с `dual_cash_mode = TRUE` эти шаги дублируются/разделяются через `owner_role`: opener заполняет свой набор (касса А), closer — свой (касса B). Общие шаги (например, комментарий менеджеру) отмечаются как `shared`.
+`terminal_choice` и `photo_terminal` разделяют выбор/фото: RunSteps.value_text хранит выбранный терминал (`T-Bank`, `Sberbank`, «Третий терминал»), а фото добавляется в Attachments (`step_code = photo_terminal`, `kind = pos_receipt:<role>:<terminal>`). Шаг считается выполненным только при наличии выбора и фото.
+
+Для магазинов с `dual_cash_mode = TRUE` эти шаги дублируются/разделяются через `owner_role`: opener заполняет свой набор (касса А), closer — свой (касса B). Общие шаги отмечаются как `both` и создают отдельные записи RunSteps для каждой роли.
 
 ## Sheet: `Runs`
 - `run_id` (uuid)
@@ -75,7 +76,7 @@
 - `closer_user_id` (int64), `closer_username` (string, optional), `closer_at` (ISO datetime)
 - `current_active_user_id` (int64) — кто сейчас ведёт смену; блокирует закрытие и повторные действия.
 - `template_open_id` (string), `template_close_id` (string)
-- `template_phase_map` (json) — сопоставление `phase → template_id` (например, `{"open":"open_v1","check_1100":"check_morning_v1","check_1600":"check_midday_v1","check_1900":"check_evening_v1","close":"close_v1","finance":"finance_v1"}`)
+- `template_phase_map` (json) — сопоставление `phase → template_id` (например, `{"open":"opening_v3","continue":"continue_v2","close":"closing_v3"}`)
 - `delta_rub` (number), `comment` (string)
 - `version` (int), `created_at`, `finished_at` (ISO)
 
@@ -86,9 +87,10 @@
 - Поля `template_open_id` и `template_close_id` дублируют значения из `template_phase_map.open` и `.close` (оставлены для обратной совместимости, но должны синхронизироваться при записи).
 
 ## Sheet: `RunSteps`
-- `run_id, phase(open|check_1100|check_1600|check_1900|close|finance), step_code, owner_role(opener|closer|shared), value_*, delta_number, comment, status, updated_at, idempotency_key, performer_user_id`
+- `run_id, phase(open|continue|close), step_code, owner_role(opener|closer|shared|both), value_*, delta_number, comment, status, started_at, updated_at, idempotency_key, performer_user_id`
+`photo_terminal` хранит выбор терминала в `value_text` (`T-Bank`, `Sberbank` или «Третий терминал»), а фото добавляется в Attachments (`step_code = photo_terminal`, `kind = pos_receipt:<role>:<terminal>`) отдельно для каждой роли; шаг закрывается только если сохранены и выбор, и фото.
 
-`owner_role` дублирует значение из TemplateSteps и помогает боту/напоминаниям понимать, кому показывать шаг. `performer_user_id` (опционально) фиксирует, кто фактически обновил шаг — важно для сценария двух касс.
+`owner_role` дублирует значение из TemplateSteps и помогает боту/напоминаниям понимать, кому показывать шаг. `started_at`/`updated_at` фиксируют, когда сотрудник начал и завершил шаг; `performer_user_id` (опционально) отмечает, кто фактически обновил шаг — важно для сценария двух касс.
 
 ## Attachments
 
@@ -97,7 +99,7 @@
 | run_id | string | ✔ | FK → Runs. |
 | step_code | string | ✔ | Какому шагу принадлежит фото. |
 | telegram_file_id | string | ✔ | ID файла в Telegram. |
-| kind | enum(z_report, pos_receipt, other) | ✔ | Тип вложения. |
+| kind | enum(z_report, pos_receipt, other) | ✔ | Тип вложения (`pos_receipt` включает фото чеков/сверки по терминалам). |
 | created_at | datetime | ✔ | Момент загрузки. |
 
 ## Sheet: `Audit`
@@ -149,3 +151,7 @@
 2. Выдать сервисному аккаунту доступ уровня «Редактор».
 3. Добавить примерные записи (1 магазин, 1 шаблон, 3–4 шага) для интеграционных тестов.
 4. В README указать ID таблицы и диапазоны, которые использует бот (например, `Users!A:H`).
+
+## Напоминания и алерты (персист)
+- Флаги `reminder_state[slot]` хранятся во внешнем Redis per run/slot (чтобы исключать дубли рассылок), не пишутся в `Runs`. Сбрасываются при смене статуса на `returned`/`closed`.
+- Delta-alerts используют Redis для кулдауна (`delta_alert:<run_id>`) и настройки из env (`DELTA_THRESHOLD_RUB`, `DELTA_ALERT_COOLDOWN_SEC`).

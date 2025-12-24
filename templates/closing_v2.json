@@ -1,0 +1,70 @@
+{
+  "template": {
+    "template_id": "closing_v2",
+    "name": "Закрытие смены v2 (роль B финал)",
+    "version": 2,
+    "phase": "close",
+    "description": "Финальные шаги закрытия для B: ~20:00"
+  },
+  "steps": [
+    {
+      "step_order": 1,
+      "code": "start_close",
+      "title": "Начало закрытия",
+      "type": "check",
+      "required": true,
+      "hint": "Подтвердите начало закрытия смены",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 2,
+      "code": "cash_final",
+      "title": "Итоговый остаток кассы",
+      "type": "number",
+      "required": true,
+      "validators_json": "{\"min\":0,\"max\":500000,\"delta_threshold\":300}",
+      "hint": "Введите фактическую сумму в кассе на закрытие",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 3,
+      "code": "safe_balance_close",
+      "title": "Остаток в сейфе на закрытие",
+      "type": "number",
+      "required": false,
+      "validators_json": "{\"min\":0,\"max\":500000}",
+      "hint": "Введите остаток в сейфе",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 4,
+      "code": "photo_z_report",
+      "title": "Фото Z-отчёта",
+      "type": "photo",
+      "required": true,
+      "hint": "Загрузите фото Z-отчёта (обязательно!)",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 5,
+      "code": "delta_comment_b",
+      "title": "Комментарий по расхождению (B)",
+      "type": "text",
+      "required": false,
+      "validators_json": "{\"delta_threshold\":300}",
+      "hint": "Обязателен при расхождении ≥ 300₽",
+      "owner_role": "closer"
+    },
+    {
+      "step_order": 6,
+      "code": "summary_confirm",
+      "title": "Подтверждение итога",
+      "type": "check",
+      "required": true,
+      "hint": "Подтвердите корректность всех данных смены",
+      "owner_role": "closer"
+    }
+  ]
+}
+
+

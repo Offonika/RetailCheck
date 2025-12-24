@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from datetime import date
+import json
+from dataclasses import dataclass
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
 
 from aiogram import Bot
+from aiogram.client.bot import DefaultBotProperties
 from loguru import logger
+from redis.asyncio import Redis
 
 from retailcheck.config import AppConfig, load_app_config
 from retailcheck.runs.repository import RunsRepository
@@ -12,7 +17,50 @@ from retailcheck.runsteps.repository import RunStepsRepository
 from retailcheck.sheets.client import SheetsClient
 from retailcheck.shops.models import ShopInfo
 from retailcheck.shops.repository import ShopsRepository
+from retailcheck.templates.repository import TemplateRepository
 from retailcheck.users.repository import UsersRepository
+
+UTC = getattr(datetime, "UTC", timezone.utc)  # noqa: UP017 - keep fallback for older Python
+
+@dataclass
+class ReminderSchedule:
+    initial: list[int]
+    repeat: int
+    after_time: time | None = None
+    after_interval: int | None = None
+
+
+@dataclass
+class ReminderState:
+    last_sent: datetime | None = None
+    count: int = 0
+
+
+@dataclass(frozen=True)
+class StepRequirement:
+    code: str
+    title: str
+    owner_roles: set[str]
+    required: bool
+    phase: str
+
+
+OPENER_SCHEDULE = ReminderSchedule(
+    initial=[15, 30],
+    repeat=45,
+    after_time=time(hour=18, minute=0),
+    after_interval=10,
+)
+CLOSER_SCHEDULE = ReminderSchedule(
+    initial=[15, 25],
+    repeat=30,
+    after_time=time(hour=20, minute=0),
+    after_interval=10,
+)
+CLOSING_SCHEDULE = ReminderSchedule(
+    initial=[10, 20],
+    repeat=30,
+)
 
 
 class ReminderService:
@@ -24,6 +72,8 @@ class ReminderService:
         runsteps_repo: RunStepsRepository,
         shops_repo: ShopsRepository,
         users_repo: UsersRepository,
+        templates_repo: TemplateRepository,
+        redis: Redis,
     ) -> None:
         self._config = config
         self._sheets = sheets
@@ -31,8 +81,13 @@ class ReminderService:
         self._runsteps_repo = runsteps_repo
         self._shops_repo = shops_repo
         self._users_repo = users_repo
-        self._bot = Bot(token=config.bot.token, parse_mode="HTML")
+        self._templates_repo = templates_repo
+        self._bot = Bot(
+            token=config.bot.token,
+            default=DefaultBotProperties(parse_mode="HTML"),
+        )
         self._user_cache: dict[str, int] | None = None
+        self._redis = redis
 
     async def run_mode(self, mode: str, shop_ids: list[str] | None = None) -> None:
         shops = await self._shops_repo.list_active()
@@ -46,7 +101,8 @@ class ReminderService:
         user_index = await self._build_user_index()
         for shop in shops:
             try:
-                await self._process_shop(mode, shop, today, user_index)
+                run = await self._runs_repo.get_run(shop.shop_id, today)
+                await self._process_pending_steps(shop, run, user_index)
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Reminder failed for shop %s: %s", shop.shop_id, exc)
 
@@ -55,6 +111,14 @@ class ReminderService:
     ) -> None:
         title = _format_title(mode, shop)
         run = await self._runs_repo.get_run(shop.shop_id, today)
+        if run and run.status in {"closed", "returned"}:
+            await self._reset_reminder_state(run.run_id)
+            if run.status == "closed":
+                return
+        # New mode: pending_steps — reminds about incomplete steps by role
+        if mode == "pending_steps":
+            await self._process_pending_steps(shop, run, user_index)
+            return
         if mode.startswith("dual:"):
             slot = mode.split(":", 1)[1] if ":" in mode else ""
             await self._process_dual_slot(slot, shop, run, title, user_index)
@@ -83,9 +147,13 @@ class ReminderService:
         if mode == "open":
             if not run.opener_user_id:
                 text = f"{title}\n{shop.name}: требуется назначить opener перед началом смены."
-                await self._send_reminder(
-                    self._broadcast_ids(shop, user_index), text, include_manager_group=True
-                )
+                slot_id = _build_slot_id("open", shop.shop_id, run.run_id if run else None)
+                if await self._should_send(slot_id):
+                    delivered = await self._send_reminder(
+                        self._broadcast_ids(shop, user_index), text, include_manager_group=True
+                    )
+                    if delivered:
+                        await self._mark_sent(slot_id)
             elif open_pending:
                 text = (
                     f"{title}\n" f"{shop.name}: завершите шаги открытия: {', '.join(open_pending)}."
@@ -93,14 +161,24 @@ class ReminderService:
                 opener_ids = self._resolve_run_user(
                     run.opener_user_id, run.opener_username, user_index
                 )
-                await self._send_reminder(opener_ids, text, include_manager_group=True)
+                slot_id = _build_slot_id("open", shop.shop_id, run.run_id)
+                if await self._should_send(slot_id):
+                    delivered = await self._send_reminder(
+                        opener_ids, text, include_manager_group=True
+                    )
+                    if delivered:
+                        await self._mark_sent(slot_id)
         else:
             closer_needed = run.status in {"in_progress", "ready_to_close", "returned"}
             if closer_needed and not run.closer_user_id:
                 text = f"{title}\n{shop.name}: назначьте closera для закрытия смены."
-                await self._send_reminder(
-                    self._broadcast_ids(shop, user_index), text, include_manager_group=True
-                )
+                slot_id = _build_slot_id("close", shop.shop_id, run.run_id if run else None)
+                if await self._should_send(slot_id):
+                    delivered = await self._send_reminder(
+                        self._broadcast_ids(shop, user_index), text, include_manager_group=True
+                    )
+                    if delivered:
+                        await self._mark_sent(slot_id)
             elif close_pending:
                 text = (
                     f"{title}\n"
@@ -109,7 +187,243 @@ class ReminderService:
                 closer_ids = self._resolve_run_user(
                     run.closer_user_id, run.closer_username, user_index
                 )
-                await self._send_reminder(closer_ids, text, include_manager_group=True)
+                slot_id = _build_slot_id("close", shop.shop_id, run.run_id)
+                if await self._should_send(slot_id):
+                    delivered = await self._send_reminder(
+                        closer_ids, text, include_manager_group=True
+                    )
+                    if delivered:
+                        await self._mark_sent(slot_id)
+
+    async def _process_pending_steps(
+        self,
+        shop: ShopInfo,
+        run,
+        user_index: dict[str, int],
+    ) -> None:
+        if not run:
+            logger.debug("No run for shop %s, skipping reminders", shop.shop_id)
+            return
+        if run.status == "closed":
+            await self._reset_reminder_state(run.run_id)
+            return
+        if run.status == "returned":
+            await self._reset_reminder_state(run.run_id)
+        steps = await self._runsteps_repo.list_for_run(run.run_id)
+        tz = ZoneInfo(shop.timezone)
+        now_local = datetime.now(UTC).astimezone(tz)
+        requirements = self._collect_required_steps(run)
+        titles = {req.code: req.title for req in requirements}
+        closer_day_started = any(
+            (step.owner_role or "").lower() == "closer" and step.phase != "close" for step in steps
+        )
+        # Не стартуем напоминания B, пока ближний не нажал «Продолжить смену» (нет шагов closer в run)
+        closer_reminders_enabled = closer_day_started
+        opener_pending = self._pending_required(requirements, steps, role="opener", phases={"open"})
+        closer_pending = self._pending_required(
+            requirements, steps, role="closer", phases={"open", "continue"}
+        )
+        closing_pending = self._pending_required(
+            requirements, steps, role="closer", phases={"close"}
+        )
+        if not closer_reminders_enabled:
+            closer_pending = []
+        opener_start = _to_local(run.opener_at, tz)
+        closer_start = _to_local(run.closer_at, tz)
+        closing_start = self._closing_started_at(steps, tz)
+
+        if opener_pending and opener_start and run.opener_user_id:
+            opener_ids = self._resolve_run_user(
+                run.opener_user_id, run.opener_username, user_index
+            )
+            await self._send_scheduled(
+                slot_id=_build_slot_id("opener", shop.shop_id, run.run_id),
+                schedule=OPENER_SCHEDULE,
+                start_time=opener_start,
+                now_local=now_local,
+                recipients=opener_ids,
+                text=self._format_pending_text(shop.name, "A", opener_pending, titles),
+                include_manager_group=False,
+            )
+        if closer_pending and closer_start and run.closer_user_id:
+            closer_ids = self._resolve_run_user(
+                run.closer_user_id, run.closer_username, user_index
+            )
+            await self._send_scheduled(
+                slot_id=_build_slot_id("closer", shop.shop_id, run.run_id),
+                schedule=CLOSER_SCHEDULE,
+                start_time=closer_start,
+                now_local=now_local,
+                recipients=closer_ids,
+                text=self._format_pending_text(shop.name, "B", closer_pending, titles),
+                include_manager_group=False,
+            )
+        if closing_pending and closing_start and run.closer_user_id:
+            closer_ids = self._resolve_run_user(
+                run.closer_user_id, run.closer_username, user_index
+            )
+            await self._send_scheduled(
+                slot_id=_build_slot_id("closing", shop.shop_id, run.run_id),
+                schedule=CLOSING_SCHEDULE,
+                start_time=closing_start,
+                now_local=now_local,
+                recipients=closer_ids,
+                text=self._format_pending_text(shop.name, "Закрытие", closing_pending, titles),
+                include_manager_group=True,
+            )
+
+    def _collect_required_steps(self, run) -> list[StepRequirement]:
+        requirements: dict[str, StepRequirement] = {}
+        phase_map = dict(run.template_phase_map or {})
+        if not phase_map.get("open") and run.template_open_id:
+            phase_map["open"] = run.template_open_id
+        if not phase_map.get("close") and run.template_close_id:
+            phase_map["close"] = run.template_close_id
+        seen_templates: set[str] = set()
+        for template_id in phase_map.values():
+            if not template_id or template_id in seen_templates:
+                continue
+            seen_templates.add(template_id)
+            try:
+                template = self._templates_repo.get(template_id)
+            except KeyError:
+                logger.warning("Template %s not found for reminders", template_id)
+                continue
+            for step in template.steps:
+                owner = (step.owner_role or "shared").lower()
+                if owner == "both":
+                    owner_roles = {"opener", "closer"}
+                elif owner:
+                    owner_roles = {owner}
+                else:
+                    owner_roles = {"shared"}
+                existing = requirements.get(step.code)
+                title = step.title
+                required = bool(step.required)
+                phase_value = getattr(template, "phase", "open") or "open"
+                if existing:
+                    owner_roles |= existing.owner_roles
+                    required = existing.required or required
+                    title = existing.title or title
+                    phase_value = existing.phase
+                requirements[step.code] = StepRequirement(
+                    code=step.code,
+                    title=title,
+                    owner_roles=owner_roles,
+                    required=required,
+                    phase=phase_value,
+                )
+        return list(requirements.values())
+
+    def _pending_required(
+        self,
+        requirements: list[StepRequirement],
+        steps: list[RunStepRecord],
+        role: str,
+        phases: set[str] | None = None,
+    ) -> list[str]:
+        step_map: dict[tuple[str, str], list[RunStepRecord]] = {}
+        for step in steps:
+            owner = (step.owner_role or "shared").lower()
+            step_map.setdefault((step.step_code, owner), []).append(step)
+            step_map.setdefault((step.step_code, "any"), []).append(step)
+        pending: list[str] = []
+        for req in requirements:
+            if not req.required:
+                continue
+            if phases and req.phase not in phases:
+                continue
+            owners = req.owner_roles
+            if owners == {"shared"}:
+                records = step_map.get((req.code, "any"), [])
+                done = any(rec.status in {"ok", "skipped"} for rec in records)
+                if not done:
+                    pending.append(req.code)
+                continue
+            if role not in owners:
+                continue
+            records = step_map.get((req.code, role), []) or step_map.get((req.code, "shared"), [])
+            done = any(rec.status in {"ok", "skipped"} for rec in records)
+            if not done:
+                pending.append(req.code)
+        return pending
+
+    def _closing_started_at(self, steps: list[RunStepRecord], tz: ZoneInfo) -> datetime | None:
+        timestamps: list[datetime] = []
+        for step in steps:
+            if step.phase != "close":
+                continue
+            started = _parse_iso_datetime(step.started_at)
+            if started:
+                timestamps.append(started.astimezone(tz))
+        return min(timestamps) if timestamps else None
+
+    def _format_pending_text(
+        self,
+        shop_name: str,
+        role_label: str,
+        step_codes: list[str],
+        titles: dict[str, str],
+    ) -> str:
+        readable = [titles.get(code, code) for code in step_codes]
+        bullets = "\n".join(f"• {item}" for item in readable)
+        return (
+            f"📋 {shop_name}: не завершены шаги ({role_label}):\n"
+            f"{bullets}\n"
+            "Напоминания продолжатся, пока обязательные шаги не будут выполнены."
+        )
+
+    async def _send_scheduled(
+        self,
+        slot_id: str,
+        schedule: ReminderSchedule,
+        start_time: datetime | None,
+        now_local: datetime,
+        recipients: list[int],
+        text: str,
+        include_manager_group: bool = False,
+    ) -> None:
+        if not start_time or not recipients:
+            return
+        should_send, new_state = await self._should_send_schedule(
+            slot_id, schedule, start_time, now_local
+        )
+        if not should_send:
+            return
+        delivered = await self._send_reminder(recipients, text, include_manager_group)
+        if delivered:
+            await self._mark_sent(slot_id, new_state)
+
+    async def _should_send_schedule(
+        self,
+        slot_id: str,
+        schedule: ReminderSchedule,
+        start_time: datetime,
+        now_local: datetime,
+    ) -> tuple[bool, ReminderState]:
+        state = await self._get_state(slot_id)
+        if now_local < start_time:
+            return False, state
+        last_local = state.last_sent.astimezone(now_local.tzinfo) if state.last_sent else None
+        elapsed_min = (now_local - start_time).total_seconds() / 60
+        use_after_interval = schedule.after_time and now_local.time() >= schedule.after_time
+        if state.count < len(schedule.initial) and not use_after_interval:
+            next_due = schedule.initial[state.count]
+            if elapsed_min >= next_due:
+                return True, ReminderState(last_sent=now_local, count=state.count + 1)
+            return False, state
+        interval = (
+            schedule.after_interval
+            if use_after_interval and schedule.after_interval
+            else schedule.repeat
+        )
+        if interval <= 0:
+            return False, state
+        minutes_since_last = _minutes_since(last_local, now_local)
+        if minutes_since_last is None or minutes_since_last >= interval:
+            new_count = max(state.count, len(schedule.initial)) + 1
+            return True, ReminderState(last_sent=now_local, count=new_count)
+        return False, state
 
     async def _process_dual_slot(
         self,
@@ -160,7 +474,14 @@ class ReminderService:
             )
         if not recipients:
             recipients = self._broadcast_ids(shop, user_index)
-        await self._send_reminder(recipients, "\n".join(lines), include_manager_group=True)
+        slot_id = f"dual:{shop.shop_id}:{slot}:{run.run_id}"
+        if not await self._should_send(slot_id):
+            return
+        delivered = await self._send_reminder(
+            recipients, "\n".join(lines), include_manager_group=True
+        )
+        if delivered:
+            await self._mark_sent(slot_id)
 
     async def close(self) -> None:
         await self._bot.session.close()
@@ -208,13 +529,15 @@ class ReminderService:
 
     async def _send_reminder(
         self, direct_ids: list[int], text: str, include_manager_group: bool
-    ) -> None:
+    ) -> bool:
         manager_ids = self._config.notifications.manager_chat_ids
         delivered = await self._send_to_ids(direct_ids, text)
         if include_manager_group and manager_ids:
-            await self._send_to_ids(manager_ids, text)
+            delivered_group = await self._send_to_ids(manager_ids, text)
+            delivered = delivered or delivered_group
         elif not delivered and manager_ids:
-            await self._send_to_ids(manager_ids, text)
+            delivered = await self._send_to_ids(manager_ids, text)
+        return delivered
 
     async def _send_to_ids(self, chat_ids: list[int], text: str) -> bool:
         delivered = False
@@ -225,6 +548,45 @@ class ReminderService:
             except Exception as exc:  # noqa: BLE001
                 logger.error("Failed to send reminder to %s: %s", chat_id, exc)
         return delivered
+
+    async def _get_state(self, slot_id: str) -> ReminderState:
+        key = f"reminder_state:{slot_id}"
+        raw = await self._redis.get(key)
+        if not raw:
+            return ReminderState()
+        try:
+            payload = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            return ReminderState()
+        last_sent = (
+            _parse_iso_datetime(payload.get("last_sent")) if isinstance(payload, dict) else None
+        )
+        count = 0
+        if isinstance(payload, dict):
+            try:
+                count = int(payload.get("count", 0) or 0)
+            except (TypeError, ValueError):
+                count = 0
+        return ReminderState(last_sent=last_sent, count=count)
+
+    async def _should_send(self, slot_id: str) -> bool:
+        """Compatibility helper for legacy modes (send once if not sent yet)."""
+        state = await self._get_state(slot_id)
+        return state.last_sent is None
+
+    async def _mark_sent(self, slot_id: str, state: ReminderState | None = None) -> None:
+        key = f"reminder_state:{slot_id}"
+        payload_state = state or ReminderState(last_sent=datetime.now(UTC), count=1)
+        payload = {
+            "last_sent": payload_state.last_sent.isoformat() if payload_state.last_sent else "",
+            "count": payload_state.count,
+        }
+        await self._redis.setex(key, 3 * 24 * 3600, json.dumps(payload))
+
+    async def _reset_reminder_state(self, run_id: str) -> None:
+        pattern = f"reminder_state:*:{run_id}"
+        async for key in self._redis.scan_iter(match=pattern):
+            await self._redis.delete(key)
 
 
 def _format_title(mode: str, shop: ShopInfo) -> str:
@@ -250,6 +612,19 @@ def _pending_steps(steps: list[RunStepRecord], owner_roles: set[str]) -> list[st
     return result
 
 
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    """Parse ISO datetime string, return None if invalid."""
+    if not value:
+        return None
+    try:
+        # Handle various ISO formats
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 async def run_reminders(mode: str, shop_ids: list[str] | None = None) -> None:
     config = load_app_config()
     sheets = SheetsClient(
@@ -260,8 +635,38 @@ async def run_reminders(mode: str, shop_ids: list[str] | None = None) -> None:
     runsteps_repo = RunStepsRepository(sheets)
     shops_repo = ShopsRepository(sheets)
     users_repo = UsersRepository(sheets)
-    service = ReminderService(config, sheets, runs_repo, runsteps_repo, shops_repo, users_repo)
+    templates_repo = TemplateRepository(sheets)
+    redis = Redis.from_url(config.redis.url)
+    service = ReminderService(
+        config,
+        sheets,
+        runs_repo,
+        runsteps_repo,
+        shops_repo,
+        users_repo,
+        templates_repo,
+        redis,
+    )
     try:
         await service.run_mode(mode, shop_ids)
     finally:
         await service.close()
+        await redis.close()
+
+
+def _build_slot_id(mode: str, shop_id: str, run_id: str | None) -> str:
+    base_run = run_id or "no_run"
+    return f"{mode}:{shop_id}:{base_run}"
+
+
+def _minutes_since(previous: datetime | None, now: datetime) -> float | None:
+    if not previous:
+        return None
+    return (now - previous).total_seconds() / 60
+
+
+def _to_local(timestamp: str | None, tz: ZoneInfo) -> datetime | None:
+    parsed = _parse_iso_datetime(timestamp)
+    if not parsed:
+        return None
+    return parsed.astimezone(tz)

@@ -1,3 +1,3 @@
 shop_id,name,timezone,open_time,close_time,manager_usernames,employee_usernames,reminder_slots,allow_anyone,dual_cash_mode,is_active,created_at
-shop_1,"Магазин 1",Europe/Moscow,09:00,21:00,"@manager_shop1","@Zuuuuhra99 @o_lisaaaa @Asad_lkaev @a1III11 @VviVkk @offonar","{""dual_checks"":[""12:00"",""13:00"",""13:30"",""15:00"",""16:00"",""16:30"",""17:30""]}",FALSE,TRUE,TRUE,2025-01-10T09:00:00Z
-shop_2,"Магазин 2",Europe/Moscow,10:00,22:00,"@manager_shop2","@a1III11 @VviVkk @Zuuuuhra99 @o_lisaaaa","",FALSE,FALSE,TRUE,2025-01-10T09:00:00Z
+shop_1,"Магазин 1",Europe/Moscow,09:00,21:00,"@manager_shop1 @bela1502","@Zuuuuhra99 @o_lisaaaa @Asad_lkaev @a1III11 @VviVkk @offonar @bela1502","{""dual_checks"":[""12:00"",""13:00"",""13:30"",""15:00"",""16:00"",""16:30"",""17:30""]}",FALSE,TRUE,TRUE,2025-01-10T09:00:00Z
+shop_2,"Магазин 2",Europe/Moscow,10:00,22:00,"@manager_shop2 @bela1502","@a1III11 @VviVkk @Zuuuuhra99 @o_lisaaaa @bela1502","",FALSE,FALSE,TRUE,2025-01-10T09:00:00Z

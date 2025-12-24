@@ -39,6 +39,10 @@ class RunsRepository:
         return None
 
     def _save_run_sync(self, record: RunRecord) -> None:
+        # WARNING: This method uses read-modify-write pattern without locking.
+        # Concurrent updates to different records may cause data loss.
+        # For production, consider adding Redis locks or using optimistic locking
+        # with version field.
         records = self._list_runs_sync()
         updated = False
         for idx, existing in enumerate(records):

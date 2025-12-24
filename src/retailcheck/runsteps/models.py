@@ -17,6 +17,7 @@ RUN_STEP_HEADERS = [
     "comment",
     "performer_user_id",
     "status",
+    "started_at",
     "updated_at",
     "idempotency_key",
 ]
@@ -39,6 +40,7 @@ class RunStepRecord:
     comment: str | None = None
     performer_user_id: str | None = None
     status: str = "pending"
+    started_at: str = now_iso()
     updated_at: str = now_iso()
     idempotency_key: str | None = None
 
@@ -55,6 +57,7 @@ class RunStepRecord:
             self.comment or "",
             self.performer_user_id or "",
             self.status,
+            self.started_at,
             self.updated_at,
             self.idempotency_key or "",
         ]
@@ -62,6 +65,9 @@ class RunStepRecord:
     @classmethod
     def from_row(cls, row: list[str]) -> RunStepRecord:
         padded = row + [""] * (len(RUN_STEP_HEADERS) - len(row))
+        started_idx = RUN_STEP_HEADERS.index("started_at")
+        updated_idx = RUN_STEP_HEADERS.index("updated_at")
+        idempotency_idx = RUN_STEP_HEADERS.index("idempotency_key")
         return cls(
             run_id=padded[0],
             phase=padded[1],
@@ -74,6 +80,7 @@ class RunStepRecord:
             comment=padded[8] or None,
             performer_user_id=padded[9] or None,
             status=padded[10] or "pending",
-            updated_at=padded[11] or now_iso(),
-            idempotency_key=padded[12] or None,
+            started_at=padded[started_idx] or now_iso(),
+            updated_at=padded[updated_idx] or now_iso(),
+            idempotency_key=padded[idempotency_idx] or None,
         )

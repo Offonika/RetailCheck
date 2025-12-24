@@ -132,14 +132,32 @@ def _format_attachments_summary(
 ) -> str:
     if not attachments:
         return ""
-    role_by_step = {step.step_code: step.owner_role or "shared" for step in steps}
+    roles_by_step: dict[str, list[str]] = {}
+    for step in steps:
+        role = (step.owner_role or "shared").lower()
+        roles_by_step.setdefault(step.step_code, []).append(role)
     entries: list[str] = []
     for att in attachments:
         descriptor = att.step_code
-        kind = (att.kind or "").strip()
+        kind_raw = (att.kind or "").strip()
+        kind, role_hint = _split_kind_role(kind_raw)
         if kind:
             descriptor = f"{descriptor}:{kind}"
-        role_prefix = role_by_step.get(att.step_code, "shared")
+        owners = roles_by_step.get(att.step_code) or ["shared"]
+        role_prefix = role_hint or (owners[0] if len(set(owners)) == 1 else "shared")
         entries.append(f"{role_prefix}:{descriptor}={att.telegram_file_id}")
     entries.sort()
     return ", ".join(entries)
+
+
+def _split_kind_role(kind_raw: str) -> tuple[str, str | None]:
+    parts = [part for part in (kind_raw or "").split(":") if part]
+    if not parts:
+        return "", None
+    role: str | None = None
+    if len(parts) > 1 and parts[1] in {"opener", "closer"}:
+        role = parts[1]
+        base = ":".join([parts[0]] + parts[2:]) if len(parts) > 2 else parts[0]
+    else:
+        base = kind_raw
+    return base, role
