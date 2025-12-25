@@ -45,22 +45,88 @@ class StepRequirement:
     phase: str
 
 
-OPENER_SCHEDULE = ReminderSchedule(
-    initial=[15, 30],
-    repeat=45,
-    after_time=time(hour=18, minute=0),
-    after_interval=10,
-)
-CLOSER_SCHEDULE = ReminderSchedule(
-    initial=[15, 25],
-    repeat=30,
-    after_time=time(hour=20, minute=0),
-    after_interval=10,
-)
-CLOSING_SCHEDULE = ReminderSchedule(
-    initial=[10, 20],
-    repeat=30,
-)
+# Fixed-time reminder slots per shop/role
+SHOP_FIXED_SCHEDULES: dict[str, dict[str, list[tuple[str, list[str]]]]] = {
+    # Магазин 1: роли A/B разнесены
+    "shop_1": {
+        "opener": [
+            ("09:00", ["cash_start", "photo_x_report"]),
+            ("11:00", ["cash_check_1"]),
+            ("11:30", ["credit_check_1"]),
+            ("14:00", ["noncash_check_1"]),
+            ("14:30", ["cash_check_2"]),
+            ("16:30", ["credit_check_2"]),
+            ("17:00", ["noncash_check_2"]),
+            ("17:30", ["cash_check_3"]),
+        ],
+        "opener_end": [
+            (
+                "18:00",
+                [
+                    "withdrawal",
+                    "pko",
+                    "photo_statement",
+                    "photo_acquiring",
+                    "terminal_choice",
+                    "photo_terminal",
+                    "cash_1c",
+                ],
+            )
+        ],
+        "closer": [
+            ("11:00", ["cash_check_1"]),
+            ("11:30", ["credit_check_1"]),
+            ("14:00", ["noncash_check_1"]),
+            ("14:30", ["cash_check_2"]),
+            ("17:30", ["credit_check_2"]),
+            ("18:00", ["noncash_check_2"]),
+            ("19:30", ["cash_check_3"]),
+        ],
+        "closer_end": [
+            (
+                "20:00",
+                [
+                    "withdrawal",
+                    "pko",
+                    "photo_statement",
+                    "photo_acquiring",
+                    "terminal_choice",
+                    "photo_terminal",
+                    "cash_1c",
+                ],
+            )
+        ],
+    },
+    # Магазин 2: один сотрудник, график 10–19
+    "shop_2": {
+        "single": [
+            ("10:00", ["cash_start", "photo_x_report"]),
+            ("12:00", ["cash_check_1"]),
+            ("12:30", ["credit_check_1"]),
+            ("14:30", ["noncash_check_1"]),
+            ("15:00", ["cash_check_2"]),
+            ("17:00", ["credit_check_2"]),
+            ("17:30", ["noncash_check_2"]),
+            ("18:00", ["cash_check_3"]),
+        ],
+        "single_end": [
+            (
+                "19:00",
+                [
+                    "withdrawal",
+                    "pko",
+                    "photo_statement",
+                    "photo_acquiring",
+                    "terminal_choice",
+                    "photo_terminal",
+                    "cash_1c",
+                ],
+            )
+        ],
+    },
+}
+
+CLOSING_SCHEDULE = ReminderSchedule(initial=[10, 20], repeat=30)
 
 
 class ReminderService:
@@ -217,47 +283,38 @@ class ReminderService:
         closer_day_started = any(
             (step.owner_role or "").lower() == "closer" and step.phase != "close" for step in steps
         )
-        # Не стартуем напоминания B, пока ближний не нажал «Продолжить смену» (нет шагов closer в run)
-        closer_reminders_enabled = closer_day_started
-        opener_pending = self._pending_required(requirements, steps, role="opener", phases={"open"})
-        closer_pending = self._pending_required(
-            requirements, steps, role="closer", phases={"open", "continue"}
-        )
+        closer_enabled = closer_day_started
+
+        schedules = SHOP_FIXED_SCHEDULES.get(shop.shop_id, {})
+        if not shop.dual_cash_mode:
+            await self._process_single_schedule(
+                shop,
+                run,
+                steps,
+                requirements,
+                titles,
+                schedules,
+                now_local,
+                user_index,
+            )
+        else:
+            await self._process_dual_schedule(
+                shop,
+                run,
+                steps,
+                requirements,
+                titles,
+                schedules,
+                now_local,
+                user_index,
+                closer_enabled,
+            )
+
+        # Reminders for closing phase (после start_close)
         closing_pending = self._pending_required(
             requirements, steps, role="closer", phases={"close"}
         )
-        if not closer_reminders_enabled:
-            closer_pending = []
-        opener_start = _to_local(run.opener_at, tz)
-        closer_start = _to_local(run.closer_at, tz)
         closing_start = self._closing_started_at(steps, tz)
-
-        if opener_pending and opener_start and run.opener_user_id:
-            opener_ids = self._resolve_run_user(
-                run.opener_user_id, run.opener_username, user_index
-            )
-            await self._send_scheduled(
-                slot_id=_build_slot_id("opener", shop.shop_id, run.run_id),
-                schedule=OPENER_SCHEDULE,
-                start_time=opener_start,
-                now_local=now_local,
-                recipients=opener_ids,
-                text=self._format_pending_text(shop.name, "A", opener_pending, titles),
-                include_manager_group=False,
-            )
-        if closer_pending and closer_start and run.closer_user_id:
-            closer_ids = self._resolve_run_user(
-                run.closer_user_id, run.closer_username, user_index
-            )
-            await self._send_scheduled(
-                slot_id=_build_slot_id("closer", shop.shop_id, run.run_id),
-                schedule=CLOSER_SCHEDULE,
-                start_time=closer_start,
-                now_local=now_local,
-                recipients=closer_ids,
-                text=self._format_pending_text(shop.name, "B", closer_pending, titles),
-                include_manager_group=False,
-            )
         if closing_pending and closing_start and run.closer_user_id:
             closer_ids = self._resolve_run_user(
                 run.closer_user_id, run.closer_username, user_index
@@ -483,6 +540,184 @@ class ReminderService:
         if delivered:
             await self._mark_sent(slot_id)
 
+    async def _process_single_schedule(
+        self,
+        shop: ShopInfo,
+        run,
+        steps: list[RunStepRecord],
+        requirements: list[StepRequirement],
+        titles: dict[str, str],
+        schedules: dict[str, list[tuple[str, list[str]]]],
+        now_local: datetime,
+        user_index: dict[str, int],
+    ) -> None:
+        if not run.opener_user_id:
+            return
+        opener_ids = self._resolve_run_user(run.opener_user_id, run.opener_username, user_index)
+        tz = ZoneInfo(shop.timezone)
+        opener_slots = schedules.get("single") or schedules.get("opener") or []
+        end_slots = schedules.get("single_end") or []
+        pending_general = {code for code in self._pending_required(requirements, steps, "opener")}
+        await self._send_fixed_slots(
+            shop,
+            run,
+            slots=opener_slots,
+            role_label="A",
+            pending_codes=pending_general,
+            titles=titles,
+            recipients=opener_ids,
+            now_local=now_local,
+            tz=tz,
+            repeat_minutes=None,
+        )
+        await self._send_fixed_slots(
+            shop,
+            run,
+            slots=end_slots,
+            role_label="A",
+            pending_codes=pending_general,
+            titles=titles,
+            recipients=opener_ids,
+            now_local=now_local,
+            tz=tz,
+            repeat_minutes=10,
+            slot_suffix="end",
+        )
+
+    async def _process_dual_schedule(
+        self,
+        shop: ShopInfo,
+        run,
+        steps: list[RunStepRecord],
+        requirements: list[StepRequirement],
+        titles: dict[str, str],
+        schedules: dict[str, list[tuple[str, list[str]]]],
+        now_local: datetime,
+        user_index: dict[str, int],
+        closer_enabled: bool,
+    ) -> None:
+        tz = ZoneInfo(shop.timezone)
+        opener_slots = schedules.get("opener") or []
+        opener_end_slots = schedules.get("opener_end") or []
+        closer_slots = schedules.get("closer") or []
+        closer_end_slots = schedules.get("closer_end") or []
+        opener_pending = {
+            code for code in self._pending_required(requirements, steps, "opener", phases={"open"})
+        }
+        closer_pending = (
+            {
+                code
+                for code in self._pending_required(
+                    requirements, steps, "closer", phases={"open", "continue"}
+                )
+            }
+            if closer_enabled
+            else set()
+        )
+        if run.opener_user_id:
+            opener_ids = self._resolve_run_user(run.opener_user_id, run.opener_username, user_index)
+            await self._send_fixed_slots(
+                shop,
+                run,
+                slots=opener_slots,
+                role_label="A",
+                pending_codes=opener_pending,
+                titles=titles,
+                recipients=opener_ids,
+                now_local=now_local,
+                tz=tz,
+                repeat_minutes=None,
+            )
+            await self._send_fixed_slots(
+                shop,
+                run,
+                slots=opener_end_slots,
+                role_label="A",
+                pending_codes=opener_pending,
+                titles=titles,
+                recipients=opener_ids,
+                now_local=now_local,
+                tz=tz,
+                repeat_minutes=10,
+                slot_suffix="end",
+            )
+        if closer_pending and run.closer_user_id:
+            closer_ids = self._resolve_run_user(run.closer_user_id, run.closer_username, user_index)
+            await self._send_fixed_slots(
+                shop,
+                run,
+                slots=closer_slots,
+                role_label="B",
+                pending_codes=closer_pending,
+                titles=titles,
+                recipients=closer_ids,
+                now_local=now_local,
+                tz=tz,
+                repeat_minutes=None,
+            )
+            await self._send_fixed_slots(
+                shop,
+                run,
+                slots=closer_end_slots,
+                role_label="B",
+                pending_codes=closer_pending,
+                titles=titles,
+                recipients=closer_ids,
+                now_local=now_local,
+                tz=tz,
+                repeat_minutes=10,
+                slot_suffix="end",
+            )
+
+    async def _send_fixed_slots(
+        self,
+        shop: ShopInfo,
+        run,
+        slots: list[tuple[str, list[str]]],
+        role_label: str,
+        pending_codes: set[str],
+        titles: dict[str, str],
+        recipients: list[int],
+        now_local: datetime,
+        tz: ZoneInfo,
+        repeat_minutes: int | None,
+        slot_suffix: str | None = None,
+        include_manager_group: bool = True,
+    ) -> None:
+        if not recipients:
+            return
+        for slot_time_str, codes in slots:
+            slot_time = _parse_hh_mm(slot_time_str, tz, now_local.date())
+            if not slot_time or now_local < slot_time:
+                continue
+            missing = [code for code in codes if code in pending_codes]
+            if not missing:
+                continue
+            slot_id = f"fixed:{run.run_id}:{role_label}:{slot_time_str}"
+            if slot_suffix:
+                slot_id += f":{slot_suffix}"
+            if not await self._should_send_fixed(slot_id, now_local, repeat_minutes):
+                continue
+            text = self._format_pending_text(shop.name, role_label, missing, titles)
+            delivered = await self._send_reminder(
+                recipients,
+                text,
+                include_manager_group=include_manager_group,
+            )
+            if delivered:
+                await self._mark_sent(slot_id, ReminderState(last_sent=now_local, count=1))
+
+    async def _should_send_fixed(
+        self, slot_id: str, now_local: datetime, repeat_minutes: int | None
+    ) -> bool:
+        state = await self._get_state(slot_id)
+        if state.last_sent is None:
+            return True
+        if repeat_minutes is None:
+            return False
+        delta_minutes = _minutes_since(state.last_sent, now_local)
+        return delta_minutes is None or delta_minutes >= repeat_minutes
+
     async def close(self) -> None:
         await self._bot.session.close()
 
@@ -663,6 +898,21 @@ def _minutes_since(previous: datetime | None, now: datetime) -> float | None:
     if not previous:
         return None
     return (now - previous).total_seconds() / 60
+
+
+def _parse_hh_mm(value: str, tz: ZoneInfo, current_date: date) -> datetime | None:
+    try:
+        hour, minute = value.split(":")
+        return datetime(
+            year=current_date.year,
+            month=current_date.month,
+            day=current_date.day,
+            hour=int(hour),
+            minute=int(minute),
+            tzinfo=tz,
+        )
+    except Exception:
+        return None
 
 
 def _to_local(timestamp: str | None, tz: ZoneInfo) -> datetime | None:
